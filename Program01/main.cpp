@@ -5,9 +5,11 @@
 using namespace std;
 int main(int argc, char const *argv[])
 {
-    /* code */
     P01::Hello();
-    P01::SMTPServer();
+    int port;
+    cout<<"Port: ";
+    cin>>port;
+    P01::SMTPServer(port);
     P01::Goodbye();
     return 0;
 }

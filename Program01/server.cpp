@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <vector>
 #include <netdb.h>
+#include <ctime>
 
 using namespace std;
 using namespace P01;
@@ -21,20 +22,14 @@ void P01::Goodbye()
     cout<<"Peace out hoe!\n";
 }
 
-void P01::SMTPServer()
+void P01::SMTPServer(int _Port)
 {
-    int port;
-    cout<<"Port: ";
-    cin>>port;
     struct sockaddr_in address;
     address.sin_family = AF_INET;
-    address.sin_port = htons(port);
+    address.sin_port = htons(_Port);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     char hostname[255];
-    // string hname;
-    // gethostname(hname.c_str,255);
-    // cout<<hname<<endl;
     int getnameinfoValue = gethostname(hostname,sizeof(hostname));
     if(getnameinfoValue == 0)
     {
@@ -65,83 +60,123 @@ void P01::SMTPServer()
     cout<<"Client Information"<<endl;
     cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
     cout<<"     Port: " << clnt_addr.sin_port << endl;
-// 220 mobile.siue.edu Microsoft ESMTP MAIL Service, 
-// Version: 8.5.9600.16384 ready at  Sun, 23 Sep 2018 21:03:50 -0500
+
     string msg = "220 ";
     msg += hostname;
     msg += " Haddock's SMTP Mail Service, ready at ";
-
+    msg += GetCurrentTimeStamp() + "\n";
     int sent = send(sckaccept,msg.c_str(),msg.length() - 1,0);
+    int helo_rsp = 0;
     while(sckaccept > 0)
     {
         char rcvBuffer[32];
         int receive = recv(sckaccept,rcvBuffer,32,0);
-        cout<<"Receive: " << receive<<endl;
-        string msg = "";
-        for(int i = 0; i < receive; i++)
+        if(receive > 0)
         {
-            //Grab all visible character
-            if(rcvBuffer[i]>31)
-                msg += toupper(rcvBuffer[i]);
-        }
-        cout<<"Msg Received: "<<msg<< " Length: " << msg.length()<<endl; 
-        vector<string>cmd;
-        string cmd_entry = "";
-        for(int i = 0; i < msg.length(); i++)
-        {
-            if(msg[i] != ' ')
+            cout<<"Receive: " << receive<<endl;
+            string msg = "";
+            for(int i = 0; i < receive; i++)
             {
-                cmd_entry += msg[i];
+                //Grab all visible character
+                if(rcvBuffer[i]>31)
+                    msg += toupper(rcvBuffer[i]);
             }
-            else
+            cout<<"Msg Received: "<<msg<< " Length: " << msg.length()<<endl; 
+            vector<string>cmd;
+            string cmd_entry = "";
+            for(int i = 0; i < msg.length(); i++)
+            {
+                if(msg[i] != ' ')
+                {
+                    cmd_entry += msg[i];
+                }
+                else
+                {
+                    cmd.push_back(cmd_entry);
+                    cmd_entry = "";
+                }
+            }
+            if(cmd_entry.length() > 0)
             {
                 cmd.push_back(cmd_entry);
-                cmd_entry = "";
             }
-        }
-        if(cmd_entry.length() > 0)
-        {
-            cmd.push_back(cmd_entry);
-        }
-        
-        if(cmd[0] == "QUIT")
-        {
-            close(sckaccept);
-            sckaccept = 0;            
-        }
-        else if(msg == "HELO")
-        {
-            string ip = inet_ntoa(clnt_addr.sin_addr);
-            SMTPHelo(&sckaccept,hostname,"[" + ip + "]");
-        }
-        else if(msg == "MAIL FROM")
-        {
+            
+            if(cmd[0] == "QUIT")
+            {
+                close(sckaccept);
+                sckaccept = 0;            
+            }
+            else if(msg == "HELO")
+            {
+                string ip = inet_ntoa(clnt_addr.sin_addr);
+                helo_rsp = SMTPHelo(&sckaccept,hostname,"[" + ip + "]");
+            }
+            if(helo_rsp > 0)
+            {
+                if(msg == "MAIL FROM")
+                {
 
-        }
-        else if(msg == "RCPT TO")
-        {
+                }
+                else if(msg == "RCPT TO")
+                {
 
-        }
-        else if(msg == "DATA")
-        {
+                }
+                else if(msg == "DATA")
+                {
 
-        }
-        else if(msg == "HELP")
-        {
+                }
+                else if(msg == "HELP")
+                {
 
+                }
+            }
         }
         close(scklisten);
         close(sckbind);
-        close(sck);
-    }
+        close(sck);    }
 }
-//#include <arpa/inet.h>
 
 int P01::SMTPHelo(int *_ClientSocket, string _HostName, string _ClientInformation)
+{    
+    string msg = _HostName + " Hello " + _ClientInformation;
+    // char msgSend[msg.length()];
+    // strcpy(msgSend,msg.c_str());
+    // return send(*_ClientSocket,msgSend,sizeof(msgSend),0);
+    return SMTPSendResponse(_ClientSocket,250,msg);
+}
+
+string P01::GetCurrentTimeStamp()
 {
-    
-    string msg = "250 " + _HostName + " Hello " + _ClientInformation + "\n";
-    char msgSend[msg.length()];
-    strcpy(msgSend,msg.c_str());
-    return send(*_ClientSocket,msgSend,sizeof(msgSend),0);
+    time_t _time = time(NULL);
+    struct tm * currtime = localtime(&_time);
+    return asctime(currtime);
+}
+int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message = "")
+{
+    string msg = "";
+    switch (_ResponseCode)
+    {
+        case 220:
+            msg = "220 ";
+            break;
+        case 250:
+            msg = "250 " + _Message + "\n";
+            break;
+        case 503:
+            msg = "503 Bad sequence of commands: " +_Message + "\n";
+            break;    
+        default:
+            msg += _ResponseCode + " " + _Message + "\n";
+            break;
+    }
+    if(msg.length() > 0)
+    {
+        char msgSend[msg.length()];
+        strcpy(msgSend,msg.c_str());
+        return send(*_ClientSocket,msgSend,sizeof(msgSend),0);
+    }
+    else
+    {
+        return -1;
+    }
 }
