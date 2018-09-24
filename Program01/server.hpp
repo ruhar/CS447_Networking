@@ -7,3 +7,4 @@ namespace P01
     int SMTPHelo(int *_ClientSocket, std::string _HostName, std::string _ClientInformation = "");
     void SMTPMailFrom();
 }
+//Test
