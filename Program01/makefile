@@ -1,4 +1,4 @@
-#makefile for server.cpp in P01 test
+#makefile for server.cpp in P01
 main: main.o server.o
 	g++ -Wall -g -o main.app main.o server.o
 	

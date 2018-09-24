@@ -10,7 +10,7 @@
 
 using namespace std;
 using namespace P01;
-//Test
+
 void P01::Hello()
 {
     cout<<"What's up bitch!\n";
