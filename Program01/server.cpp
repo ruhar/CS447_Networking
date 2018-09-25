@@ -12,6 +12,12 @@
 using namespace std;
 using namespace P01;
 
+enum EMAIL {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
+// const DATE = 0;
+// const FROM = 1;
+// const TO = 2;
+
+
 void P01::Hello()
 {
     cout<<"What's up bitch!\n";
@@ -20,6 +26,7 @@ void P01::Hello()
 void P01::Goodbye()
 {
     cout<<"Peace out hoe!\n";
+    
 }
 
 void P01::SMTPServer(int _Port)
@@ -69,6 +76,7 @@ void P01::SMTPServer(int _Port)
     int helo_rsp = 0;
     int mailfrom_rsp = 0;
     int rcptto_rsp = 0;
+    string email[5];
     while(sckaccept > 0)
     {
         char rcvBuffer[32];
@@ -82,30 +90,44 @@ void P01::SMTPServer(int _Port)
                 //Grab all visible character
                 if(rcvBuffer[i]>31)
                 {
-                    // msg += toupper(rcvBuffer[i]);
                     msg += rcvBuffer[i];
                 }
             }
             cout<<"Msg Received: "<<msg<< " Length: " << msg.length()<<endl; 
             vector<string>cmd;
             string cmd_entry = "";
-            for(int i = 0; i < msg.length(); i++)
+            int firstSpace = msg.find_first_of(' ');
+            if(firstSpace < 0)
             {
-                if(msg[i] != ' ')
-                {
-                    cmd_entry += msg[i];
-                }
-                else
-                {
-                    cmd.push_back(cmd_entry);
-                    cmd_entry = "";
-                }
+                cmd.push_back(msg);
             }
-            if(cmd_entry.length() > 0)
+            else
             {
-                cmd.push_back(cmd_entry);
-            }            
-            cout<<"CMD: "<<cmd[0]<<endl;
+                cmd.push_back(msg.substr(0,firstSpace));
+                cmd.push_back(msg.substr(firstSpace + 1, msg.length()));
+            }
+            for(int i = 0; i < cmd.size(); i++)
+            {
+                cout<<"CMD["<< i << "]: "<<cmd[i]<<endl;
+            }
+            // for(int i = 0; i < msg.length(); i++)
+            // {
+            //     if(msg[i] != ' ')
+            //     {
+            //         cmd_entry += msg[i];
+            //     }
+            //     else
+            //     {
+            //         cmd.push_back(cmd_entry);
+            //         cmd_entry = "";
+            //     }
+            // }
+            // if(cmd_entry.length() > 0)
+            // {
+            //     cmd.push_back(cmd_entry);
+            // }            
+            // cout<<"CMD: "<<cmd[0]<<endl;
+
             if(StrToUpper(cmd[0]) == "QUIT")
             {
                 close(sckaccept);
@@ -123,25 +145,29 @@ void P01::SMTPServer(int _Port)
             }            
             else if(StrToUpper(cmd[0]) == "MAIL")
             {
-                // cout<<"HELO RSP: "<<helo_rsp<<endl;
                 if(helo_rsp > 0)
                 {
-                    cout<<"Size: "<<cmd.size()<<endl;
-                    if(cmd.size() > 1)
+                    //cout<<"Size: "<<cmd.size()<<endl;
+                    string mailFrom[2];
+                    int firstColon = cmd[1].find_first_of(':'); 
+                    if(firstColon > 0)
                     {
-                        if(StrToUpper(cmd[1]) == "FROM:")
+                        mailFrom[0] = cmd[1].substr(0,firstColon);
+                        if(StrToUpper(mailFrom[0]) == "FROM")
                         {
-                            if(cmd.size() > 2)
+                            if(cmd[1].length() - firstColon > 0)
                             {
+                                mailFrom[1] = cmd[1].substr(firstColon + 1,cmd[1].length());
                                 string maildomain = "";
                                 string mailrcpt = "";
-                                string mailaddr = cmd[2];
+                                string mailaddr = trim(mailFrom[1]);
                                 int atposition = mailaddr.find_first_of('@');
-                                maildomain = mailaddr.substr(atposition, sizeof(mailaddr) - 2);
+                                maildomain = mailaddr.substr(atposition, mailaddr.length() - 2);
                                 mailrcpt = mailaddr.substr(1,atposition - 1);
+                                cout<<"Mail Address: " << mailaddr << endl;
                                 cout<<"Domain: "<< maildomain << endl;
                                 cout<<"Recipient: "<< mailrcpt << endl;
-                                if(mailaddr[0] == '<' && mailaddr[cmd.size() - 1] == '>' && StrToUpper(maildomain) == "@447F18.EDU")
+                                if(mailaddr[0] == '<' && mailaddr[mailaddr.length() - 1] == '>' && StrToUpper(maildomain) == "@447F18.EDU")
                                 {
                                     mailfrom_rsp = 1;
                                 }
@@ -272,4 +298,45 @@ string P01::StrToUpper(string _InputString)
         upper += toupper(_InputString[i]);
     }
     return upper;
+}
+string P01::ltrim(string _InputString, char _Character)
+{       
+    if(_InputString.length() > 0)
+    {
+        while(_InputString[0] == _Character)
+        {
+            if(_InputString.length() > 2)
+            {
+                _InputString = _InputString.substr(1,_InputString.length());
+            }
+            else
+                _InputString = "";
+        }
+        return _InputString;
+    }
+    else
+        return _InputString;
+
+}
+string P01::rtrim(string _InputString, char _Character)
+{
+    if(_InputString.length() > 0)
+    {
+        while(_InputString[_InputString.length() - 1] == _Character)
+        {
+            if(_InputString.length() > 2)
+                _InputString = _InputString.substr(0,_InputString.length() - 2);
+            else
+                _InputString = "";
+        }
+        return _InputString;
+    }
+    else
+    {
+        return _InputString;
+    }
+}
+string P01::trim(string _InputString, char _Character)
+{
+    return rtrim(ltrim(_InputString,_Character),_Character);
 }

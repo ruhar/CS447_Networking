@@ -9,4 +9,7 @@ namespace P01
     std::string GetCurrentTimeStamp();
     int SMTPSendResponse(int *_ClientSocket, int _ResponsCode, std::string _Message);
     std::string StrToUpper(std::string _InputString);
+    std::string ltrim(std::string _InputString, char _Character = ' ');
+    std::string rtrim(std::string _InputString, char _Character = ' ');
+    std::string trim(std::string _InputString, char _Character = ' ');
 }
