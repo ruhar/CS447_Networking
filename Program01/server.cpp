@@ -8,6 +8,7 @@
 #include <vector>
 #include <netdb.h>
 #include <ctime>
+#include <regex>
 
 using namespace std;
 using namespace P01;
@@ -108,25 +109,11 @@ void P01::SMTPServer(int _Port)
             }
             for(int i = 0; i < cmd.size(); i++)
             {
+                cout<<"start: "<<i<<endl;
                 cout<<"CMD["<< i << "]: "<<cmd[i]<<endl;
+                cout<<"end: "<<i<<endl;
             }
-            // for(int i = 0; i < msg.length(); i++)
-            // {
-            //     if(msg[i] != ' ')
-            //     {
-            //         cmd_entry += msg[i];
-            //     }
-            //     else
-            //     {
-            //         cmd.push_back(cmd_entry);
-            //         cmd_entry = "";
-            //     }
-            // }
-            // if(cmd_entry.length() > 0)
-            // {
-            //     cmd.push_back(cmd_entry);
-            // }            
-            // cout<<"CMD: "<<cmd[0]<<endl;
+            cout<<"Error: 1"<<endl;
 
             if(StrToUpper(cmd[0]) == "QUIT")
             {
@@ -147,61 +134,79 @@ void P01::SMTPServer(int _Port)
             {
                 if(helo_rsp > 0)
                 {
-                    //cout<<"Size: "<<cmd.size()<<endl;
-                    string mailFrom[2];
-                    int firstColon = cmd[1].find_first_of(':'); 
-                    if(firstColon > 0)
+                    if(cmd.size() > 1)
                     {
-                        mailFrom[0] = cmd[1].substr(0,firstColon);
-                        if(StrToUpper(mailFrom[0]) == "FROM")
+                        string mailFrom[2];
+                        int firstColon = cmd[1].find_first_of(':'); 
+                        if(firstColon > 0)
                         {
-                            if(cmd[1].length() - firstColon > 0)
+                            mailFrom[0] = cmd[1].substr(0,firstColon);
+                            if(StrToUpper(mailFrom[0]) == "FROM")
                             {
-                                mailFrom[1] = cmd[1].substr(firstColon + 1,cmd[1].length());
-                                string maildomain = "";
-                                string mailrcpt = "";
-                                string mailaddr = trim(mailFrom[1]);
-                                int atposition = mailaddr.find_first_of('@');
-                                maildomain = mailaddr.substr(atposition, mailaddr.length() - 2);
-                                mailrcpt = mailaddr.substr(1,atposition - 1);
-                                cout<<"Mail Address: " << mailaddr << endl;
-                                cout<<"Domain: "<< maildomain << endl;
-                                cout<<"Recipient: "<< mailrcpt << endl;
-                                if(mailaddr[0] == '<' && mailaddr[mailaddr.length() - 1] == '>' && StrToUpper(maildomain) == "@447F18.EDU")
+                                if((cmd[1].length() - 1) - firstColon > 0)
                                 {
-                                    mailfrom_rsp = 1;
-                                }
+                                    mailFrom[1] = cmd[1].substr(firstColon + 1,cmd[1].length());
+                                    string mailaddr = trim(mailFrom[1]);
+                                    regex pattern("<+[\\w._%+-]+@[447f18.edu]+>", std::regex_constants::icase);
+                                    if(regex_match(mailaddr,pattern))
+                                    {
+                                        email[FROM] = mailaddr;
+                                        mailfrom_rsp = 1;
+                                    }
+                                    else
+                                    {
+                                        SMTPSendResponse(&sckaccept,501,"Invalid address");
+                                    }
+                                }                            
                                 else
                                 {
                                     SMTPSendResponse(&sckaccept,501,"Invalid address");
                                 }
-                            }                            
+                            }
                             else
                             {
-                                SMTPSendResponse(&sckaccept,501,"Invalid address");
+                                SMTPSendResponse(&sckaccept,500,"Unrecognized parameter: " + cmd[1]);
                             }
                         }
                         else
                         {
-                            SMTPSendResponse(&sckaccept,500,"Unrecognized parameter: " + cmd[1]);
+                            SMTPSendResponse(&sckaccept,501,"Argument missing");
                         }
                     }
                     else
                     {
                         SMTPSendResponse(&sckaccept,501,"Argument missing");
                     }
-                    
                 }
                 else
                 {
                     SMTPSendResponse(&sckaccept,503,"Send HELO first");
                 }
             }
-            else if(cmd[0] == "RCPT")
+            else if(regex_match(msg,regex("^(RCPT)",std::regex_constants::icase)))
             {
                 if(mailfrom_rsp > 0)
                 {
-                    rcptto_rsp = 1;
+                    if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)+(<)?([\\w._%+-])+@+(447f18.edu)+(>)?",std::regex_constants::icase)))
+                    {
+                        int firstColon = msg.find_first_of(':');
+                        string mailaddr = msg.substr(firstColon + 1,msg.length() - 1);
+                        email[TO] = mailaddr;
+                        rcptto_rsp = 1; 
+                    }
+                    else if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)",regex::icase)))
+                    {
+                        SMTPSendResponse(&sckaccept,501,"Unrecognized command");
+                    }
+                    else if(StrToUpper(trim(msg)) == "RCPT")
+                    {
+                        SMTPSendResponse(&sckaccept,501,"Argument missing");
+                    }        
+                    else if(regex_match(msg,regex("^(RCPT)",regex::icase)))
+                    {
+                        // SMTPSendResponse(&sckaccept,501,"Unrecognized parameter " + msg.substr());
+                    }            
+                    
                 }
                 else
                 {
