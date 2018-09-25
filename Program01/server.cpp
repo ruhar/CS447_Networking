@@ -67,6 +67,8 @@ void P01::SMTPServer(int _Port)
     msg += GetCurrentTimeStamp() + "\n";
     int sent = send(sckaccept,msg.c_str(),msg.length() - 1,0);
     int helo_rsp = 0;
+    int mailfrom_rsp = 0;
+    int rcptto_rsp = 0;
     while(sckaccept > 0)
     {
         char rcvBuffer[32];
@@ -79,7 +81,10 @@ void P01::SMTPServer(int _Port)
             {
                 //Grab all visible character
                 if(rcvBuffer[i]>31)
-                    msg += toupper(rcvBuffer[i]);
+                {
+                    // msg += toupper(rcvBuffer[i]);
+                    msg += rcvBuffer[i];
+                }
             }
             cout<<"Msg Received: "<<msg<< " Length: " << msg.length()<<endl; 
             vector<string>cmd;
@@ -99,52 +104,125 @@ void P01::SMTPServer(int _Port)
             if(cmd_entry.length() > 0)
             {
                 cmd.push_back(cmd_entry);
-            }
-            
-            if(cmd[0] == "QUIT")
+            }            
+            cout<<"CMD: "<<cmd[0]<<endl;
+            if(StrToUpper(cmd[0]) == "QUIT")
             {
                 close(sckaccept);
                 sckaccept = 0;            
             }
-            else if(msg == "HELO")
+            else if(StrToUpper(cmd[0]) == "HELO")
             {
                 string ip = inet_ntoa(clnt_addr.sin_addr);
                 helo_rsp = SMTPHelo(&sckaccept,hostname,"[" + ip + "]");
+                cout<<"HELO RSP: "<<helo_rsp<<endl;
             }
-            if(helo_rsp > 0)
+            else if(StrToUpper(cmd[0]) == "HELP")
             {
-                if(msg == "MAIL FROM")
-                {
 
+            }            
+            else if(StrToUpper(cmd[0]) == "MAIL")
+            {
+                // cout<<"HELO RSP: "<<helo_rsp<<endl;
+                if(helo_rsp > 0)
+                {
+                    cout<<"Size: "<<cmd.size()<<endl;
+                    if(cmd.size() > 1)
+                    {
+                        if(StrToUpper(cmd[1]) == "FROM:")
+                        {
+                            if(cmd.size() > 2)
+                            {
+                                string maildomain = "";
+                                string mailrcpt = "";
+                                string mailaddr = cmd[2];
+                                int atposition = mailaddr.find_first_of('@');
+                                maildomain = mailaddr.substr(atposition, sizeof(mailaddr) - 2);
+                                mailrcpt = mailaddr.substr(1,atposition - 1);
+                                cout<<"Domain: "<< maildomain << endl;
+                                cout<<"Recipient: "<< mailrcpt << endl;
+                                if(mailaddr[0] == '<' && mailaddr[cmd.size() - 1] == '>' && StrToUpper(maildomain) == "@447F18.EDU")
+                                {
+                                    mailfrom_rsp = 1;
+                                }
+                                else
+                                {
+                                    SMTPSendResponse(&sckaccept,501,"Invalid address");
+                                }
+                            }                            
+                            else
+                            {
+                                SMTPSendResponse(&sckaccept,501,"Invalid address");
+                            }
+                        }
+                        else
+                        {
+                            SMTPSendResponse(&sckaccept,500,"Unrecognized parameter: " + cmd[1]);
+                        }
+                    }
+                    else
+                    {
+                        SMTPSendResponse(&sckaccept,501,"Argument missing");
+                    }
+                    
                 }
-                else if(msg == "RCPT TO")
+                else
                 {
-
+                    SMTPSendResponse(&sckaccept,503,"Send HELO first");
                 }
-                else if(msg == "DATA")
+            }
+            else if(cmd[0] == "RCPT")
+            {
+                if(mailfrom_rsp > 0)
                 {
-
+                    rcptto_rsp = 1;
                 }
-                else if(msg == "HELP")
+                else
                 {
-
+                    if(helo_rsp < 1)
+                    {
+                        SMTPSendResponse(&sckaccept,503,"Send HELO first");
+                    }
+                    else
+                    {
+                        SMTPSendResponse(&sckaccept,503,"Need MAIL FROM: first");
+                    }
+                }
+            }
+            else if(cmd[0] == "DATA")
+            {
+                if(rcptto_rsp > 0)
+                {
+                    //Proces data and save email
+                }
+                else
+                {
+                    if(helo_rsp < 1)
+                    {
+                        SMTPSendResponse(&sckaccept,503,"Send HELO first");
+                    }
+                    else if(mailfrom_rsp < 1)
+                    {
+                        SMTPSendResponse(&sckaccept,503,"Need MAIL FROM: first");
+                    }
+                    else
+                    {
+                        SMTPSendResponse(&sckaccept,503,"Need RCPT TO: first");
+                    }
                 }
             }
         }
         close(scklisten);
         close(sckbind);
-        close(sck);    }
+        close(sck); 
+    }
 }
 
 int P01::SMTPHelo(int *_ClientSocket, string _HostName, string _ClientInformation)
 {    
-    string msg = _HostName + " Hello " + _ClientInformation;
-    // char msgSend[msg.length()];
-    // strcpy(msgSend,msg.c_str());
-    // return send(*_ClientSocket,msgSend,sizeof(msgSend),0);
+    string msg = "Hello " + _ClientInformation;
     return SMTPSendResponse(_ClientSocket,250,msg);
 }
-
 string P01::GetCurrentTimeStamp()
 {
     time_t _time = time(NULL);
@@ -161,6 +239,12 @@ int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message
             break;
         case 250:
             msg = "250 " + _Message + "\n";
+            break;
+        case 500:
+            msg = "500 Command syntax error: " +_Message + "\n";
+            break;
+        case 501:
+            msg = "501 Argument syntax error: " + _Message + "\n";
             break;
         case 503:
             msg = "503 Bad sequence of commands: " +_Message + "\n";
@@ -179,4 +263,13 @@ int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message
     {
         return -1;
     }
+}
+string P01::StrToUpper(string _InputString)
+{
+    string upper = "";
+    for(int i = 0; i < _InputString.size(); i++)
+    {
+        upper += toupper(_InputString[i]);
+    }
+    return upper;
 }

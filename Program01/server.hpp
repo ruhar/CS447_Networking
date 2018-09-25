@@ -8,4 +8,5 @@ namespace P01
     void SMTPMailFrom();
     std::string GetCurrentTimeStamp();
     int SMTPSendResponse(int *_ClientSocket, int _ResponsCode, std::string _Message);
+    std::string StrToUpper(std::string _InputString);
 }
