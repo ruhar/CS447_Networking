@@ -109,12 +109,13 @@ void P01::SMTPServer(int _Port)
             }
             for(int i = 0; i < cmd.size(); i++)
             {
-                cout<<"start: "<<i<<endl;
+                // cout<<"start: "<<i<<endl;
                 cout<<"CMD["<< i << "]: "<<cmd[i]<<endl;
-                cout<<"end: "<<i<<endl;
+                // cout<<"end: "<<i<<endl;
             }
-            cout<<"Error: 1"<<endl;
+            // cout<<"Error: 1"<<endl;
 
+            cout<<":"<<msg<<":"<<endl;
             if(StrToUpper(cmd[0]) == "QUIT")
             {
                 close(sckaccept);
@@ -128,7 +129,7 @@ void P01::SMTPServer(int _Port)
             }
             else if(StrToUpper(cmd[0]) == "HELP")
             {
-
+                SMTPSendResponse(&sckaccept,502);
             }            
             else if(StrToUpper(cmd[0]) == "MAIL")
             {
@@ -151,6 +152,7 @@ void P01::SMTPServer(int _Port)
                                     if(regex_match(mailaddr,pattern))
                                     {
                                         email[FROM] = mailaddr;
+                                        SMTPSendResponse(&sckaccept,250,mailaddr);
                                         mailfrom_rsp = 1;
                                     }
                                     else
@@ -183,18 +185,25 @@ void P01::SMTPServer(int _Port)
                     SMTPSendResponse(&sckaccept,503,"Send HELO first");
                 }
             }
-            else if(regex_match(msg,regex("^(RCPT)",std::regex_constants::icase)))
+            else if(regex_match(msg,regex("^(RCPT)((.)+)?",std::regex_constants::icase)))
             {
+                cout<<"1:"<<msg<<":"<<endl;
+                cout<<"Test 1"<<endl;
                 if(mailfrom_rsp > 0)
                 {
+                    cout<<"Test 2"<<endl;
+                    cout<<"2:"<<msg<<":"<<endl;
                     if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)+(<)?([\\w._%+-])+@+(447f18.edu)+(>)?",std::regex_constants::icase)))
                     {
+                        cout<<"Test 3"<<endl;
                         int firstColon = msg.find_first_of(':');
                         string mailaddr = msg.substr(firstColon + 1,msg.length() - 1);
+                        cout<<"RCPT Addr: "<<mailaddr<<endl;
                         email[TO] = mailaddr;
+                        SMTPSendResponse(&sckaccept,250,mailaddr);
                         rcptto_rsp = 1; 
                     }
-                    else if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)",regex::icase)))
+                    else if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)",std::regex::icase)))
                     {
                         SMTPSendResponse(&sckaccept,501,"Unrecognized command");
                     }
@@ -202,11 +211,15 @@ void P01::SMTPServer(int _Port)
                     {
                         SMTPSendResponse(&sckaccept,501,"Argument missing");
                     }        
-                    else if(regex_match(msg,regex("^(RCPT)",regex::icase)))
+                    else if(regex_match(msg,regex("^(RCPT(\\s){1,})",std::regex::icase)))
                     {
-                        // SMTPSendResponse(&sckaccept,501,"Unrecognized parameter " + msg.substr());
+                        int firstSpace = msg.find_first_of(' ');
+                        SMTPSendResponse(&sckaccept,501,"Unrecognized parameter " + msg.substr(firstSpace + 1, msg.length() -1));
                     }            
-                    
+                    else
+                    {
+                        SMTPSendResponse(&sckaccept,500);
+                    }
                 }
                 else
                 {
@@ -220,11 +233,21 @@ void P01::SMTPServer(int _Port)
                     }
                 }
             }
-            else if(cmd[0] == "DATA")
+            // else if(cmd[0] == "DATA")
+            else if(regex_match(msg,regex("^(DATA)",std::regex::icase)))
             {
                 if(rcptto_rsp > 0)
                 {
                     //Proces data and save email
+                    string data="";
+                    do
+                    {
+                        char dataBuffer[32];
+                        int receive = recv(sckaccept,dataBuffer,32,0);
+                        data += dataBuffer;
+                        cout<<data;
+                    }while(regex_match(data,regex("(\\r\\n\\.\\r\\n)$")));
+                    cout<<"Processing data..."<<endl;
                 }
                 else
                 {
@@ -242,11 +265,21 @@ void P01::SMTPServer(int _Port)
                     }
                 }
             }
+            else
+            {
+                cout<<"Test 5"<<endl;
+            }
+            cout<<"End of if block"<<endl;
         }
         close(scklisten);
         close(sckbind);
         close(sck); 
     }
+    cout<<"Date: "<<email[DATE]<<endl;
+    cout<<"From: "<<email[FROM]<<endl;
+    cout<<"To: "<<email[TO]<<endl;
+    cout<<"Subject: "<<email[SUBJECT]<<endl;
+    cout<<"Data: "<<email[EMAIL::MESSAGE]<<endl;
 }
 
 int P01::SMTPHelo(int *_ClientSocket, string _HostName, string _ClientInformation)
@@ -260,7 +293,7 @@ string P01::GetCurrentTimeStamp()
     struct tm * currtime = localtime(&_time);
     return asctime(currtime);
 }
-int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message = "")
+int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message)
 {
     string msg = "";
     switch (_ResponseCode)
@@ -276,6 +309,9 @@ int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message
             break;
         case 501:
             msg = "501 Argument syntax error: " + _Message + "\n";
+            break;
+        case 502:
+            msg = "502 Command not implemented: " + _Message + "\n";
             break;
         case 503:
             msg = "503 Bad sequence of commands: " +_Message + "\n";
