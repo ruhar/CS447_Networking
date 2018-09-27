@@ -16,6 +16,8 @@
 #include <pthread.h>
 #include <thread>
 
+const int BUFFERSIZE = 128;
+
 using namespace std;
 using namespace P01;
 
@@ -33,13 +35,11 @@ void P01::Hello()
 {
     cout<<"Welcome to the electronic age Captain!\n";
 }
-
 void P01::Goodbye()
 {
     cout<<"Thank you for using Dr. Calculus's mail services!\n";
     
 }
-
 void P01::SMTPServer(int _Port)
 {
     //Create mail db directory structure
@@ -55,21 +55,6 @@ void P01::SMTPServer(int _Port)
     address.sin_port = htons(_Port);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    // char hostname[255];
-    // int getnameinfoValue = gethostname(hostname,sizeof(hostname));
-    // if(getnameinfoValue == 0)
-    // {
-    //     cout<<hostname<<endl;
-    // }
-    // else
-    // {
-    //     cout<<"Reverse lookup failed"<<endl;
-    //     cout<<"Return value: "<< getnameinfoValue;
-    //     cout<<"Error: "<<gai_strerror(getnameinfoValue)<<endl;
-    // }
-
-    // string test = "";
-    
     int sck = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
     cout<< "Socket: " << sck << endl;
     
@@ -85,7 +70,6 @@ void P01::SMTPServer(int _Port)
     int *new_sck;
     while((sckaccept = accept(sck, (struct sockaddr *) &clnt_addr, &clnt_length)))
     {
-        // int sckaccept = accept(sck, (struct sockaddr *) &clnt_addr, &clnt_length);
         cout<<"Socket Accept: " << sckaccept << endl;
         cout<<"Client Information"<<endl;
         cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
@@ -101,281 +85,7 @@ void P01::SMTPServer(int _Port)
         pthread_create(&server_thread,NULL,&SMTPServerHandler,(void*) &args);
        
     }
-
-    // string msg = hostname;
-    // msg += " Haddock's SMTP Mail Service, ready at ";
-    // msg += GetCurrentTimeStamp();
-    // SMTPSendResponse(&sckaccept,220,msg);    int helo_rsp = 0;
-    // int mailfrom_rsp = 0;
-    // int rcptto_rsp = 0;
-    // string email[5]; 
-    // while(sckaccept > 0)
-    // {
-    //     char rcvBuffer[32];
-    //     int receive = recv(sckaccept,rcvBuffer,32,0);
-    //     if(receive > 0)
-    //     {
-    //         cout<<"Receive: " << receive<<endl;
-    //         string msg = "";
-    //         for(int i = 0; i < receive; i++)
-    //         {
-    //             //Grab all visible character
-    //             if(rcvBuffer[i]>31)
-    //             {
-    //                 msg += rcvBuffer[i];
-    //             }
-    //         }
-    //         cout<<"Msg Received: "<<msg<< " Length: " << msg.length()<<endl; 
-    //         vector<string>cmd;
-    //         string cmd_entry = "";
-    //         int firstSpace = msg.find_first_of(' ');
-    //         if(firstSpace < 0)
-    //         {
-    //             cmd.push_back(msg);
-    //         }
-    //         else
-    //         {
-    //             cmd.push_back(msg.substr(0,firstSpace));
-    //             cmd.push_back(msg.substr(firstSpace + 1, msg.length()));
-    //         }
-    //         for(int i = 0; i < (int)cmd.size(); i++)
-    //         {
-    //             cout<<"CMD["<< i << "]: "<<cmd[i]<<endl;
-    //         }
-
-    //         cout<<":"<<msg<<":"<<endl;
-    //         if(StrToUpper(cmd[0]) == "QUIT")
-    //         {
-    //             close(sckaccept);
-    //             sckaccept = 0;            
-    //         }
-    //         else if(StrToUpper(cmd[0]) == "HELO")
-    //         {
-    //             string ip = inet_ntoa(clnt_addr.sin_addr);
-    //             helo_rsp = SMTPHelo(&sckaccept,hostname,"[" + ip + "]");
-    //             cout<<"HELO RSP: "<<helo_rsp<<endl;
-    //         }
-    //         else if(StrToUpper(cmd[0]) == "HELP")
-    //         {
-    //             SMTPSendResponse(&sckaccept,502);
-    //             email[DATE] = GetCurrentTimeStamp();
-    //             email[SUBJECT] = "Hello";
-    //             email[TO] = "<bhubler@447f18.edu>";
-    //             email[FROM] = "<bhubler@siue.edu>";
-    //             email[MESSAGE] = "Hello,\n\nThis is a test.\n\nThanks,\n\n\nBen";
-    //             string recipient = GetUserName(email[TO]);
-    //             // cout<<"UserName: "<<recipient<<endl;
-    //             string userpath = path + "/" + recipient;
-    //             mkdir(userpath.c_str(),0777);
-    //             DeliverEmail(email,userpath);
-    //         }            
-    //         else if(StrToUpper(cmd[0]) == "MAIL")
-    //         {
-    //             if(helo_rsp > 0)
-    //             {
-    //                 if(cmd.size() > 1)
-    //                 {
-    //                     string mailFrom[2];
-    //                     int firstColon = cmd[1].find_first_of(':'); 
-    //                     if(firstColon > 0)
-    //                     {
-    //                         mailFrom[0] = cmd[1].substr(0,firstColon);
-    //                         if(StrToUpper(mailFrom[0]) == "FROM")
-    //                         {
-    //                             if((cmd[1].length() - 1) - firstColon > 0)
-    //                             {
-    //                                 mailFrom[1] = cmd[1].substr(firstColon + 1,cmd[1].length());
-    //                                 string mailaddr = trim(mailFrom[1]);
-    //                                 regex pattern("<+[\\w._%+-]+@[447f18.edu]+>", std::regex_constants::icase);
-    //                                 if(regex_match(mailaddr,pattern))
-    //                                 {
-    //                                     email[FROM] = mailaddr;
-    //                                     SMTPSendResponse(&sckaccept,250,mailaddr);
-    //                                     mailfrom_rsp = 1;
-    //                                 }
-    //                                 else
-    //                                 {
-    //                                     SMTPSendResponse(&sckaccept,501,"Invalid address");
-    //                                 }
-    //                             }                            
-    //                             else
-    //                             {
-    //                                 SMTPSendResponse(&sckaccept,501,"Invalid address");
-    //                             }
-    //                         }
-    //                         else
-    //                         {
-    //                             SMTPSendResponse(&sckaccept,500,"Unrecognized parameter: " + cmd[1]);
-    //                         }
-    //                     }
-    //                     else
-    //                     {
-    //                         SMTPSendResponse(&sckaccept,501,"Argument missing");
-    //                     }
-    //                 }
-    //                 else
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,501,"Argument missing");
-    //                 }
-    //             }
-    //             else
-    //             {
-    //                 SMTPSendResponse(&sckaccept,503,"Send HELO first");
-    //             }
-    //         }
-    //         else if(regex_match(msg,regex("^(RCPT)((.)+)?",std::regex_constants::icase)))
-    //         {
-    //             cout<<"1:"<<msg<<":"<<endl;
-    //             cout<<"Test 1"<<endl;
-    //             if(mailfrom_rsp > 0)
-    //             {
-    //                 cout<<"Test 2"<<endl;
-    //                 cout<<"2:"<<msg<<":"<<endl;
-    //                 if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)+(<)?([\\w._%+-])+@+(447f18.edu)+(>)?",std::regex_constants::icase)))
-    //                 {
-    //                     cout<<"Test 3"<<endl;
-    //                     int firstColon = msg.find_first_of(':');
-    //                     string mailaddr = msg.substr(firstColon + 1,msg.length() - 1);
-    //                     cout<<"RCPT Addr: "<<mailaddr<<endl;
-    //                     email[TO] = mailaddr;
-    //                     SMTPSendResponse(&sckaccept,250,mailaddr);
-    //                     rcptto_rsp = 1; 
-    //                 }
-    //                 else if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)",std::regex::icase)))
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,501,"Unrecognized command");
-    //                 }
-    //                 else if(StrToUpper(trim(msg)) == "RCPT")
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,501,"Argument missing");
-    //                 }        
-    //                 else if(regex_match(msg,regex("^(RCPT(\\s){1,})",std::regex::icase)))
-    //                 {
-    //                     int firstSpace = msg.find_first_of(' ');
-    //                     SMTPSendResponse(&sckaccept,501,"Unrecognized parameter " + msg.substr(firstSpace + 1, msg.length() -1));
-    //                 }            
-    //                 else
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,500);
-    //                 }
-    //             }
-    //             else
-    //             {
-    //                 if(helo_rsp < 1)
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,503,"Send HELO first");
-    //                 }
-    //                 else
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,503,"Need MAIL FROM: first");
-    //                 }
-    //             }
-    //         }
-    //         // else if(cmd[0] == "DATA")
-    //         else if(regex_match(msg,regex("^(DATA)(\\s){0,}",std::regex::icase)))
-    //         {
-    //             if(rcptto_rsp > 0)
-    //             {
-    //                 //Proces data and save email
-    //                 string data="";
-    //                 bool getData = true;
-    //                 bool setSubject = true;
-    //                 SMTPSendResponse(&sckaccept,354,"Start mail input, end with <CRLF>.<CRLF>");
-    //                 string strBuffer = "";
-    //                 while(getData)
-    //                 {
-                        
-    //                     char dataBuffer[32];
-    //                     memset(&dataBuffer,0,sizeof(dataBuffer));
-    //                     int receive = recv(sckaccept,dataBuffer,32,0);
-    //                     for(int i = 0; i < receive; i++)
-    //                     {
-    //                         if(dataBuffer[i] == 0)
-    //                         {
-    //                             i = sizeof(dataBuffer);
-    //                         }
-    //                         else
-    //                         {
-    //                             strBuffer += dataBuffer[i];
-    //                         }
-
-    //                     }
-    //                     if(strBuffer[strBuffer.length() - 1] == 13 ||
-    //                        strBuffer[strBuffer.length() - 1] == 10)
-    //                     //Check for subject
-    //                     {
-    //                         string subj="";
-    //                         if(strBuffer.length() > 7)
-    //                         {
-    //                             subj = StrToUpper(strBuffer.substr(0,8));
-    //                         }
-    //                         if(setSubject && subj == "SUBJECT:")
-    //                         {
-    //                             string subject = strBuffer.substr(9,strBuffer.length());
-    //                             regex crlf("\n");
-    //                             subject = regex_replace(subject,crlf,"");
-    //                             email[SUBJECT] = subject;
-    //                         }
-    //                         else
-    //                         {
-    //                             data += strBuffer;
-    //                             setSubject = false;
-    //                         }
-    //                         //Check if end condition is met.
-    //                         if(data.length() >= 5)
-    //                         {
-    //                             if((int)data[data.length()-5] == 13 &&
-    //                             (int)data[data.length()-4] == 10 &&
-    //                             (int)data[data.length()-3] == 46 &&
-    //                             (int)data[data.length()-2] == 13 &&
-    //                             (int)data[data.length()-1] == 10)
-    //                             {
-    //                                 getData = false;
-    //                             }
-    //                         }
-    //                         strBuffer = "";
-    //                     }
-    //                 }
-    //                 email[EMAIL::MESSAGE] = data;
-    //                 email[DATE] = GetCurrentTimeStamp();
-    //                 string recipient = GetUserName(email[TO]);
-    //                 string userpath = path + "/" + recipient;
-    //                 mkdir(userpath.c_str(),0777);
-    //                 DeliverEmail(email,userpath);
-    //             }
-    //             else
-    //             {
-    //                 if(helo_rsp < 1)
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,503,"Send HELO first");
-    //                 }
-    //                 else if(mailfrom_rsp < 1)
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,503,"Need MAIL FROM: first");
-    //                 }
-    //                 else
-    //                 {
-    //                     SMTPSendResponse(&sckaccept,503,"Need RCPT TO: first");
-    //                 }
-    //             }
-    //         }
-    //         else
-    //         {
-    //             cout<<"Unknown Error"<<endl;
-    //         }
-    //         // cout<<"End of if block"<<endl;
-    //     }
-    //     close(scklisten);
-    //     close(sckbind);
-    //     close(sck); 
-    // }
-    // cout<<"Date: "<<email[DATE]<<endl;
-    // cout<<"From: "<<email[FROM]<<endl;
-    // cout<<"To: "<<email[TO]<<endl;
-    // cout<<"Subject: "<<email[SUBJECT]<<endl;
-    // cout<<"Message: "<<email[MESSAGE]<<endl;
 }
-
 int P01::SMTPHelo(int *_ClientSocket, string _HostName, string _ClientInformation)
 {    
     string msg = "Hello " + _ClientInformation;
@@ -560,8 +270,8 @@ void *P01::SMTPServerHandler(void *_Arguments)
     string email[5]; 
     while(sckaccept > 0)
     {
-        char rcvBuffer[32];
-        int receive = recv(sckaccept,rcvBuffer,32,0);
+        char rcvBuffer[BUFFERSIZE];
+        int receive = recv(sckaccept,rcvBuffer,BUFFERSIZE,0);
         if(receive > 0)
         {
             cout<<"Receive: " << receive<<endl;
@@ -734,9 +444,9 @@ void *P01::SMTPServerHandler(void *_Arguments)
                     while(getData)
                     {
                         
-                        char dataBuffer[32];
+                        char dataBuffer[BUFFERSIZE];
                         memset(&dataBuffer,0,sizeof(dataBuffer));
-                        int receive = recv(sckaccept,dataBuffer,32,0);
+                        int receive = recv(sckaccept,dataBuffer,BUFFERSIZE,0);
                         for(int i = 0; i < receive; i++)
                         {
                             if(dataBuffer[i] == 0)
@@ -842,4 +552,94 @@ void *P01::SMTPServerHandler(void *_Arguments)
     // cout<<"Subject: "<<email[SUBJECT]<<endl;
     // cout<<"Message: "<<email[MESSAGE]<<endl;
     return 0;
+}
+void P01::UDPServer(int _Port)
+{
+    //Create mail db directory structure
+    char buff[FILENAME_MAX];
+    getcwd(buff,FILENAME_MAX);
+    cout<<"Directory: "<<buff<<endl;
+    string udppath = buff;
+    udppath+="/db";
+    mkdir(path.c_str(),0777);
+
+    struct sockaddr_in address;
+    address.sin_family = AF_INET;
+    address.sin_port = htons(_Port);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    int sck = socket(PF_INET,SOCK_DGRAM,IPPROTO_UDP);
+    cout<< "Socket: " << sck << endl;
+    
+    int sckbind = bind(sck,(struct sockaddr *)&address,sizeof(address));
+    cout<< "Socket Bind: " << sckbind << endl;
+    while(true)
+    {
+        bool bGet = false;
+        bool bHost = false;
+        bool bCount = false;
+        char rcvBuffer[BUFFERSIZE];
+        string Request[3];
+        string strBuffer;
+        do
+        {
+        //char rcvBuffer[BUFFERSIZE]; 
+        memset(rcvBuffer,0,BUFFERSIZE); 
+             
+        struct sockaddr_in clnt_addr;
+        socklen_t clnt_length = sizeof(clnt_addr);
+        recvfrom(sck,rcvBuffer,BUFFERSIZE,0,(struct sockaddr *) &clnt_addr, &clnt_length);
+        strBuffer = rcvBuffer;
+        strBuffer = regex_replace(strBuffer,regex("\n"),"");
+        cout<<"UDP msg rcvd: "<<rcvBuffer<<endl;
+        if(regex_match(strBuffer,regex("^(get ){1}(.)+( HTTP/1.1)$",regex::icase)))
+        {
+            Request[0] = strBuffer;
+            bGet = true;
+            cout<<"GET: " << strBuffer<<endl;
+        }
+        else if(regex_match(strBuffer,regex("^(host:(\\s){0,}){1}(.)+",regex::icase)))
+        {
+            Request[1] = strBuffer;
+            bHost = true;
+            cout<<"HOST: " << strBuffer<<endl;
+        }
+        else if(regex_match(strBuffer,regex("^(count:(\\s){0,}){1}([0-9])+",regex::icase)))
+        {
+            Request[2] = strBuffer;
+            bCount = true;
+            cout<<"Count: "<< strBuffer<<endl;
+        }
+        //cout<<"Client Length: "<<clnt_length<<endl;
+        }while(!(regex_match(strBuffer,regex("^(connection:(\\s){0,}close){1}",regex::icase))));
+        if(bGet && bHost && bCount)
+        {
+            cout<<"messages received"<<endl;
+        }
+    }
+    // int scklisten = listen(sck,5);
+    // cout<<"Socket Listen: " << scklisten << endl;
+    // struct sockaddr_in clnt_addr;
+    // socklen_t clnt_length = sizeof(clnt_addr);
+    // cout<<"Client Length: "<<clnt_length<<endl;
+    // int sckaccept;
+    // int *new_sck;
+    // while((sckaccept = accept(sck, (struct sockaddr *) &clnt_addr, &clnt_length)))
+    // {
+    // cout<<"Socket Accept: " << sckaccept << endl;
+    // cout<<"Client Information"<<endl;
+    // cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
+    // cout<<"     Port: " << clnt_addr.sin_port << endl;
+
+    // pthread_t server_thread;
+    // new_sck = (int*)malloc(1);
+    // *new_sck = sckaccept;
+    // struct arg_struct args;
+    // args.arg1 = new_sck;
+    // args.arg2 = clnt_addr;
+
+    // pthread_create(&server_thread,NULL,&SMTPServerHandler,(void*) &args);
+       
+    // }
+
 }

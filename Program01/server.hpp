@@ -15,4 +15,6 @@ namespace P01
     std::string GetUserName(std::string _EmailAddress);
     int DeliverEmail(std::string _Email[],std::string _Path);
     void *SMTPServerHandler(void *_Arguments);
+    void UDPServer(int _Port);
+    //void UDPSendResponse(int *_ServerSocket,struct sockaddr_in *_ClientAddr);
 }
