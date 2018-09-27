@@ -14,6 +14,7 @@
 #include <dirent.h>
 #include <iomanip>
 #include <pthread.h>
+#include <thread>
 
 using namespace std;
 using namespace P01;
