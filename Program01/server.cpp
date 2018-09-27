@@ -9,6 +9,9 @@
 #include <netdb.h>
 #include <ctime>
 #include <regex>
+#include <fstream>
+#include <sys/stat.h>
+#include <dirent.h>
 
 using namespace std;
 using namespace P01;
@@ -21,17 +24,25 @@ enum EMAIL {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
 
 void P01::Hello()
 {
-    cout<<"What's up bitch!\n";
+    cout<<"Welcome to the electronic age Captain!\n";
 }
 
 void P01::Goodbye()
 {
-    cout<<"Peace out hoe!\n";
+    cout<<"Thank you for using Dr. Calculus's mail services!\n";
     
 }
 
 void P01::SMTPServer(int _Port)
 {
+    //Create mail db directory structure
+    char buff[FILENAME_MAX];
+    getcwd(buff,FILENAME_MAX);
+    cout<<"Directory: "<<buff<<endl;
+    string path(buff);
+    path+="/db";
+    mkdir(path.c_str(),0777);
+
     struct sockaddr_in address;
     address.sin_family = AF_INET;
     address.sin_port = htons(_Port);
@@ -69,11 +80,10 @@ void P01::SMTPServer(int _Port)
     cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
     cout<<"     Port: " << clnt_addr.sin_port << endl;
 
-    string msg = "220 ";
-    msg += hostname;
+    string msg = hostname;
     msg += " Haddock's SMTP Mail Service, ready at ";
-    msg += GetCurrentTimeStamp() + "\n";
-    int sent = send(sckaccept,msg.c_str(),msg.length() - 1,0);
+    msg += GetCurrentTimeStamp();
+    SMTPSendResponse(&sckaccept,220,msg);
     int helo_rsp = 0;
     int mailfrom_rsp = 0;
     int rcptto_rsp = 0;
@@ -107,13 +117,10 @@ void P01::SMTPServer(int _Port)
                 cmd.push_back(msg.substr(0,firstSpace));
                 cmd.push_back(msg.substr(firstSpace + 1, msg.length()));
             }
-            for(int i = 0; i < cmd.size(); i++)
+            for(int i = 0; i < (int)cmd.size(); i++)
             {
-                // cout<<"start: "<<i<<endl;
                 cout<<"CMD["<< i << "]: "<<cmd[i]<<endl;
-                // cout<<"end: "<<i<<endl;
             }
-            // cout<<"Error: 1"<<endl;
 
             cout<<":"<<msg<<":"<<endl;
             if(StrToUpper(cmd[0]) == "QUIT")
@@ -234,20 +241,76 @@ void P01::SMTPServer(int _Port)
                 }
             }
             // else if(cmd[0] == "DATA")
-            else if(regex_match(msg,regex("^(DATA)",std::regex::icase)))
+            else if(regex_match(msg,regex("^(DATA)(\\s){0,}",std::regex::icase)))
             {
                 if(rcptto_rsp > 0)
                 {
                     //Proces data and save email
                     string data="";
-                    do
+                    bool getData = true;
+                    bool setSubject = true;
+                    SMTPSendResponse(&sckaccept,354,"Start mail input, end with <CRLF>.<CRLF>");
+                    string strBuffer = "";
+                    while(getData)
                     {
+                        
                         char dataBuffer[32];
+                        memset(&dataBuffer,0,sizeof(dataBuffer));
                         int receive = recv(sckaccept,dataBuffer,32,0);
-                        data += dataBuffer;
-                        cout<<data;
-                    }while(regex_match(data,regex("(\\r\\n\\.\\r\\n)$")));
-                    cout<<"Processing data..."<<endl;
+                        for(int i = 0; i < receive; i++)
+                        {
+                            if(dataBuffer[i] == 0)
+                            {
+                                i = sizeof(dataBuffer);
+                            }
+                            else
+                            {
+                                strBuffer += dataBuffer[i];
+                            }
+
+                        }
+                        if(strBuffer[strBuffer.length() - 1] == 13 ||
+                           strBuffer[strBuffer.length() - 1] == 10)
+                        //Check for subject
+                        {
+                            string subj="";
+                            if(strBuffer.length() > 7)
+                            {
+                                subj = StrToUpper(strBuffer.substr(0,8));
+                            }
+                            if(setSubject && subj == "SUBJECT:")
+                            {
+                                string subject = strBuffer.substr(9,strBuffer.length());
+                                regex crlf("\n");
+                                subject = regex_replace(subject,crlf,"");
+                                email[SUBJECT] = subject;
+                            }
+                            else
+                            {
+                                data += strBuffer;
+                                setSubject = false;
+                            }
+                            //Check if end condition is met.
+                            if(data.length() >= 5)
+                            {
+                                if((int)data[data.length()-5] == 13 &&
+                                (int)data[data.length()-4] == 10 &&
+                                (int)data[data.length()-3] == 46 &&
+                                (int)data[data.length()-2] == 13 &&
+                                (int)data[data.length()-1] == 10)
+                                {
+                                    getData = false;
+                                }
+                            }
+                            strBuffer = "";
+                        }
+                    }
+                    email[EMAIL::MESSAGE] = data;
+                    email[DATE] = GetCurrentTimeStamp();
+                    string recipient = GetUserName(email[TO]);
+                    cout<<"UserName: "<<recipient<<endl;
+                    string userpath = path + "/" + recipient;
+                    mkdir(userpath.c_str(),0777);
                 }
                 else
                 {
@@ -267,9 +330,9 @@ void P01::SMTPServer(int _Port)
             }
             else
             {
-                cout<<"Test 5"<<endl;
+                cout<<"Unknown Error"<<endl;
             }
-            cout<<"End of if block"<<endl;
+            // cout<<"End of if block"<<endl;
         }
         close(scklisten);
         close(sckbind);
@@ -279,7 +342,7 @@ void P01::SMTPServer(int _Port)
     cout<<"From: "<<email[FROM]<<endl;
     cout<<"To: "<<email[TO]<<endl;
     cout<<"Subject: "<<email[SUBJECT]<<endl;
-    cout<<"Data: "<<email[EMAIL::MESSAGE]<<endl;
+    cout<<"Message: "<<email[MESSAGE]<<endl;
 }
 
 int P01::SMTPHelo(int *_ClientSocket, string _HostName, string _ClientInformation)
@@ -291,7 +354,10 @@ string P01::GetCurrentTimeStamp()
 {
     time_t _time = time(NULL);
     struct tm * currtime = localtime(&_time);
-    return asctime(currtime);
+    string time = asctime(currtime);
+    regex crlf("\n");
+
+    return regex_replace(time,crlf,"");
 }
 int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message)
 {
@@ -299,10 +365,13 @@ int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message
     switch (_ResponseCode)
     {
         case 220:
-            msg = "220 ";
+            msg = "220 " + _Message + "\n";
             break;
         case 250:
             msg = "250 " + _Message + "\n";
+            break;
+        case 354:
+            msg = "354 " + _Message + "\n";
             break;
         case 500:
             msg = "500 Command syntax error: " +_Message + "\n";
@@ -334,7 +403,7 @@ int P01::SMTPSendResponse(int *_ClientSocket, int _ResponseCode, string _Message
 string P01::StrToUpper(string _InputString)
 {
     string upper = "";
-    for(int i = 0; i < _InputString.size(); i++)
+    for(int i = 0; i < (int)_InputString.size(); i++)
     {
         upper += toupper(_InputString[i]);
     }
@@ -380,4 +449,30 @@ string P01::rtrim(string _InputString, char _Character)
 string P01::trim(string _InputString, char _Character)
 {
     return rtrim(ltrim(_InputString,_Character),_Character);
+}
+string P01::GetUserName(string _EmailAddress)
+{
+    string username = ltrim(_EmailAddress);
+    username = ltrim(username,'<');
+    int atsymbol = username.find_first_of('@');
+    return username.substr(0, atsymbol);
+}
+int P01::DeliverEmail(string _Email[], string _Path)
+{
+    DIR *userdir = opendir(_Path.c_str());
+    struct dirent *files;
+    vector<string> filenames;
+    if(userdir != NULL)
+    {
+        while(files == readdir(userdir) != NULL)
+        {
+            string f = files->d_name;
+            int periodFirst = f.find_first_of(.);
+            f=f.substr(0,periodFirst);
+            f=ltrim(f,'0');
+            cout<<files->d_name<<"|"<<f<<endl;
+            filenames.push_back(f);
+        }
+        // filenames
+    }
 }
