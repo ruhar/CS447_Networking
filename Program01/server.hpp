@@ -14,4 +14,5 @@ namespace P01
     std::string trim(std::string _InputString, char _Character = ' ');
     std::string GetUserName(std::string _EmailAddress);
     int DeliverEmail(std::string _Email[],std::string _Path);
+    void *SMTPServerHandler(void *_Arguments);
 }
