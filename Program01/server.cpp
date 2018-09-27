@@ -390,7 +390,7 @@ void *P01::SMTPServerHandler(void *_Arguments)
                 {
                     cout<<"Test 2"<<endl;
                     cout<<"2:"<<msg<<":"<<endl;
-                    if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:)+(<)?([\\w._%+-])+@+(447f18.edu)+(>)?",std::regex_constants::icase)))
+                    if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:){1}(<)?([\\w._%+-])+@{1}(447f18.edu){1}(>)?",std::regex_constants::icase)))
                     {
                         cout<<"Test 3"<<endl;
                         int firstColon = msg.find_first_of(':');
