@@ -1,4 +1,8 @@
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <vector>
+
 namespace P01
 {
     void Hello();
@@ -16,5 +20,7 @@ namespace P01
     int DeliverEmail(std::string _Email[],std::string _Path);
     void *SMTPServerHandler(void *_Arguments);
     void UDPServer(int _Port);
-    //void UDPSendResponse(int *_ServerSocket,struct sockaddr_in *_ClientAddr);
+    int UDPSendResponse(int *_ServerSocket,struct sockaddr_in _ClientAddr,std::string _Message);
+    void StringSplit(std::string _InputToSplit, std::vector<std::string> &_DelimitedOutput, char _Delimiter);
+    int RetrieveEmail(std::vector<std::string[2]>_Emails,std::string _Mailbox, int _Count);
 }

@@ -22,6 +22,7 @@ using namespace std;
 using namespace P01;
 
 enum EMAIL {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
+enum {GET=0,HOST,COUNT};
 // const DATE = 0;
 // const FROM = 1;
 // const TO = 2;
@@ -162,7 +163,7 @@ string P01::ltrim(string _InputString, char _Character)
     {
         while(_InputString[0] == _Character)
         {
-            if(_InputString.length() > 2)
+            if(_InputString.length() > 1)
             {
                 _InputString = _InputString.substr(1,_InputString.length());
             }
@@ -345,7 +346,7 @@ void *P01::SMTPServerHandler(void *_Arguments)
                                 {
                                     mailFrom[1] = cmd[1].substr(firstColon + 1,cmd[1].length());
                                     string mailaddr = trim(mailFrom[1]);
-                                    regex pattern("<+[\\w._%+-]+@[447f18.edu]+>", std::regex_constants::icase);
+                                    regex pattern("<?([\\w._%+-])+(@447f18.edu){1}>?", std::regex_constants::icase);
                                     if(regex_match(mailaddr,pattern))
                                     {
                                         email[FROM] = mailaddr;
@@ -556,12 +557,12 @@ void *P01::SMTPServerHandler(void *_Arguments)
 void P01::UDPServer(int _Port)
 {
     //Create mail db directory structure
-    char buff[FILENAME_MAX];
-    getcwd(buff,FILENAME_MAX);
-    cout<<"Directory: "<<buff<<endl;
-    string udppath = buff;
-    udppath+="/db";
-    mkdir(path.c_str(),0777);
+    char udpWorkingDirectory[FILENAME_MAX];
+    getcwd(udpWorkingDirectory,FILENAME_MAX);
+    cout<<"Directory: "<<udpWorkingDirectory<<endl;
+    //string udppath = buff;
+    //udppath+="/db";
+    // mkdir(upppath.c_str(),0777);
 
     struct sockaddr_in address;
     address.sin_family = AF_INET;
@@ -581,65 +582,128 @@ void P01::UDPServer(int _Port)
         char rcvBuffer[BUFFERSIZE];
         string Request[3];
         string strBuffer;
-        do
-        {
-        //char rcvBuffer[BUFFERSIZE]; 
-        memset(rcvBuffer,0,BUFFERSIZE); 
-             
         struct sockaddr_in clnt_addr;
         socklen_t clnt_length = sizeof(clnt_addr);
+        memset(rcvBuffer,0,BUFFERSIZE); 
         recvfrom(sck,rcvBuffer,BUFFERSIZE,0,(struct sockaddr *) &clnt_addr, &clnt_length);
+        vector<string> input;
         strBuffer = rcvBuffer;
-        strBuffer = regex_replace(strBuffer,regex("\n"),"");
-        cout<<"UDP msg rcvd: "<<rcvBuffer<<endl;
-        if(regex_match(strBuffer,regex("^(get ){1}(.)+( HTTP/1.1)$",regex::icase)))
+        StringSplit(strBuffer,input,10);
+        for(int i = 0; i < (int)input.size(); i++)
         {
-            Request[0] = strBuffer;
-            bGet = true;
-            cout<<"GET: " << strBuffer<<endl;
+            // cout<<input[i];
+            if(regex_match(input[i],regex("^(get ){1}(/db/)([\\w._%+-/])+( HTTP/1.1){1}$",regex::icase)))
+            {
+                Request[GET] = input[i];
+                bGet = true;
+                cout<<"GET: " << input[i]<<endl;
+            }
+            else if(regex_match(input[i],regex("^(host:( ){0,}){1}(.)+",regex::icase)))
+            {
+                Request[HOST] = input[i];
+                bHost = true;
+                cout<<"HOST: " << input[i]<<endl;
+            }
+            else if(regex_match(input[i],regex("^(count:( ){0,}){1}([0-9])+",regex::icase)))
+            {
+                Request[COUNT] = input[i];
+                bCount = true;
+                cout<<"Count: "<< input[i]<<endl;
+            }            
         }
-        else if(regex_match(strBuffer,regex("^(host:(\\s){0,}){1}(.)+",regex::icase)))
-        {
-            Request[1] = strBuffer;
-            bHost = true;
-            cout<<"HOST: " << strBuffer<<endl;
-        }
-        else if(regex_match(strBuffer,regex("^(count:(\\s){0,}){1}([0-9])+",regex::icase)))
-        {
-            Request[2] = strBuffer;
-            bCount = true;
-            cout<<"Count: "<< strBuffer<<endl;
-        }
-        //cout<<"Client Length: "<<clnt_length<<endl;
-        }while(!(regex_match(strBuffer,regex("^(connection:(\\s){0,}close){1}",regex::icase))));
         if(bGet && bHost && bCount)
         {
-            cout<<"messages received"<<endl;
+            int colonFirst = Request[COUNT].find_first_of(':');
+            string sCount = Request[COUNT].substr(colonFirst + 1,Request[COUNT].length());
+            sCount = trim(sCount,' ');
+            int count;
+            count = stoi(sCount);
+            colonFirst = Request[HOST].find_first_of(':');
+            string hostname = trim(Request[HOST].substr(colonFirst + 1,Request[HOST].length()));
+            vector<string> parseGet;
+            StringSplit(Request[GET],parseGet,32);
+            cout<<"Directory: "<<parseGet[1]<<endl;
+            cout<<"Response: "<<parseGet[2]<<endl;
+            cout<<"Server: "<<hostname<<endl;
+            cout<<"Last-Modified: "<<GetCurrentTimeStamp()<<endl;
+            string userDir = udpWorkingDirectory + rtrim(trim(parseGet[1],' '),'/');
+            string userInbox = userDir + "/inbox";
+            cout<<userDir<<endl;
+            cout<<userInbox<<endl;
+            mkdir(userDir.c_str(),0777);
+            mkdir(userInbox.c_str(),0777);
+            for(int i = 0; i < count; i++)
+            {
+
+            }
+            string msg = Request[GET] + "\n" + Request[HOST] + "\n" + Request[COUNT] + "\n";
+            // sendto(sck,msg.c_str(),msg.length(),0,(struct sockaddr *) &clnt_addr,clnt_length);
+            UDPSendResponse(&sck,clnt_addr,msg);
+            cout<<"messages received: \n"<<msg<<endl;
         }
     }
-    // int scklisten = listen(sck,5);
-    // cout<<"Socket Listen: " << scklisten << endl;
-    // struct sockaddr_in clnt_addr;
-    // socklen_t clnt_length = sizeof(clnt_addr);
-    // cout<<"Client Length: "<<clnt_length<<endl;
-    // int sckaccept;
-    // int *new_sck;
-    // while((sckaccept = accept(sck, (struct sockaddr *) &clnt_addr, &clnt_length)))
-    // {
-    // cout<<"Socket Accept: " << sckaccept << endl;
-    // cout<<"Client Information"<<endl;
-    // cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
-    // cout<<"     Port: " << clnt_addr.sin_port << endl;
+}
+int P01::UDPSendResponse(int *_ServerSocket,struct sockaddr_in _ClientAddr,string _Message)
+{
+    return sendto(*_ServerSocket,_Message.c_str(),_Message.length(),0,(struct sockaddr *) &_ClientAddr,(socklen_t)sizeof(_ClientAddr));;
+}
 
-    // pthread_t server_thread;
-    // new_sck = (int*)malloc(1);
-    // *new_sck = sckaccept;
-    // struct arg_struct args;
-    // args.arg1 = new_sck;
-    // args.arg2 = clnt_addr;
+void P01::StringSplit(string _InputToSplit,vector<string> &_DelimitedOutput, char _Delimiter)
+{
+    string line = "";
+    for(int i = 0;i < (int)_InputToSplit.length(); i++)
+    {
+        line += _InputToSplit[i];
+        if(_InputToSplit[i] == _Delimiter)
+        {
+            line = regex_replace(line,regex("\n"),"");
+            _DelimitedOutput.push_back(line);
+            line = "";
+        }
+    }
+    if(line != "")
+    {
+        line = regex_replace(line,regex("\n"),"");
+        _DelimitedOutput.push_back(line);
+    }
+}
 
-    // pthread_create(&server_thread,NULL,&SMTPServerHandler,(void*) &args);
-       
-    // }
-
+int P01::RetrieveEmail(vector<string[2]>_Emails,string _Mailbox, int _Count)
+{
+    DIR *userdir = opendir(_Mailbox.c_str());
+    struct dirent *files;
+    vector<string> filenames;
+    if(userdir != NULL)
+    {
+        while((files = readdir(userdir)) != NULL)
+        {
+            string f = files->d_name;
+            if(f != "." && f != ".." && f != "Inbox")
+            {
+                filenames.push_back(f);
+            }
+        }              
+        sort(filenames.begin(),filenames.end());
+        for(int i = filenames.size() - 1;i >= 0; i--)
+        {
+            if(_Count > 0)
+            {
+                string email[2];
+                email[0] = filenames[i];
+                ifstream f(_Mailbox);
+                stringstream buffer;
+                buffer<<f.rdbuf();
+                email[1] = buffer.str();
+                _Emails.push_back(email);
+                f.close();
+            }
+            else
+            {
+                i = -1;
+            }
+            _Count--;
+        }
+        return 0;
+    }
+    return -1;
 }
