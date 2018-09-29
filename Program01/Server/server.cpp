@@ -433,6 +433,9 @@ void *P01::SMTPServerHandler(void *_Arguments)
                         char dataBuffer[BUFFERSIZE];
                         memset(&dataBuffer,0,sizeof(dataBuffer));
                         int receive = recv(sckaccept,dataBuffer,BUFFERSIZE,0);
+                        // char msgSend[msg.length()];
+                        // strcpy(msgSend,msg.c_str());
+                        // send(sckaccept,dataBuffer,receive,0);
                         cout<<dataBuffer<<endl;
                         for(int i = 0; i < receive; i++)
                         {
@@ -480,6 +483,12 @@ void *P01::SMTPServerHandler(void *_Arguments)
                                     data = data.substr(0,data.length() - 5);
                                 }
                                 
+                                
+                            }
+                            else if(strBuffer[0] == '.')
+                            {
+                                getData = false;
+                                // data = data.substr(0,data.length() - 5);
                             }
                             strBuffer = "";
                         }

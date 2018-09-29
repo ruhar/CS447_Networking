@@ -25,12 +25,12 @@ int P01::SMTPSendEmail(string _Hostname, string _Port)
         return -1;
     }
     string input;
-    bool dataEntry = false;
+    // bool dataEntry = false;
     while(StrToUpper(input) != "QUIT")
     {
         string msg = ""; 
-        if(!dataEntry)
-        {
+        // if(!dataEntry)
+        // {
             char messageBuffer[RECEIVEBUFFERSIZE];
             memset(messageBuffer,0,RECEIVEBUFFERSIZE);
             int recvMessageSize = recv(csck,messageBuffer,RECEIVEBUFFERSIZE,0);
@@ -46,22 +46,35 @@ int P01::SMTPSendEmail(string _Hostname, string _Port)
                 // cout<<msg<<endl;
                 memset(messageBuffer,0,RECEIVEBUFFERSIZE);
             }
-        }
+        // }
         if(msg.substr(0,3) == "354")
         {
             cout<<"data entry mode"<<endl;
-            dataEntry = true;
+            // dataEntry = true;
+            while(input != ".")
+            {
+                msg = "";
+                std::getline(std::cin,input);
+                msg += input;// + "\n";
+                //cout<<msg;
+                char msgSend[msg.length()];
+                strcpy(msgSend,msg.c_str());
+                send(csck,msgSend,sizeof(msgSend),0);
+            } 
+            memset(messageBuffer,0,RECEIVEBUFFERSIZE);
+            recv(csck,messageBuffer,RECEIVEBUFFERSIZE,0);  
+            cout<<"test"<<endl;         
         }
         cout<<msg;
         std::getline(std::cin,input);
         // input += "\n";
-        cout<<"|"<<input<<"|"<<endl;
-        if(input == ".")
-        {
-            dataEntry = false;
-            cout<<"exit data entry mode";
-            input = "\n.\n";
-        }
+        // cout<<"|"<<input<<"|"<<endl;
+        // if(input == ".")
+        // {
+        //     cout<<"exit data entry mode";
+        //     dataEntry = false;
+        //     //input = "\n.\n";
+        // }
         char msgSend[input.length()];
         strcpy(msgSend,input.c_str());
         send(csck,msgSend,sizeof(msgSend),0);
