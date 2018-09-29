@@ -23,12 +23,13 @@ using namespace P01;
 
 enum EMAIL {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
 enum {GET=0,HOST,COUNT};
+enum {RESPONSE=0,SERVER,LASTMODIFIED,RETRIEVECOUNT,CONTENTTYPE,MESSAGECOUNT};
 // const DATE = 0;
 // const FROM = 1;
 // const TO = 2;
 struct arg_struct
 {
-    int *arg1;
+    int arg1;
     struct sockaddr_in arg2;
 };
 string path;
@@ -46,7 +47,7 @@ void P01::SMTPServer(int _Port)
     //Create mail db directory structure
     char buff[FILENAME_MAX];
     getcwd(buff,FILENAME_MAX);
-    cout<<"Directory: "<<buff<<endl;
+    // cout<<"Directory: "<<buff<<endl;
     path = buff;
     path+="/db";
     mkdir(path.c_str(),0777);
@@ -57,30 +58,32 @@ void P01::SMTPServer(int _Port)
     address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int sck = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
-    cout<< "Socket: " << sck << endl;
-    
     int sckbind = bind(sck,(struct sockaddr *)&address,sizeof(address));
-    cout<< "Socket Bind: " << sckbind << endl;
-    
-    int scklisten = listen(sck,5);
-    cout<<"Socket Listen: " << scklisten << endl;
+    if(sckbind < 0)
+    {
+        cout<<_Port<<" TCP port is not available, restart with a new port."<<endl;
+    }
+    else
+    {
+        cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
+    }
+    listen(sck,5);
     struct sockaddr_in clnt_addr;
     socklen_t clnt_length = sizeof(clnt_addr);
-    cout<<"Client Length: "<<clnt_length<<endl;
     int sckaccept;
     int *new_sck;
     while((sckaccept = accept(sck, (struct sockaddr *) &clnt_addr, &clnt_length)))
     {
-        cout<<"Socket Accept: " << sckaccept << endl;
-        cout<<"Client Information"<<endl;
-        cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
-        cout<<"     Port: " << clnt_addr.sin_port << endl;
+        // cout<<"Socket Accept: " << sckaccept << endl;
+        // cout<<"Client Information"<<endl;
+        // cout<<"  Address: " << clnt_addr.sin_addr.s_addr << endl;
+        // cout<<"     Port: " << clnt_addr.sin_port << endl;
 
         pthread_t server_thread;
         new_sck = (int*)malloc(1);
         *new_sck = sckaccept;
         struct arg_struct args;
-        args.arg1 = new_sck;
+        args.arg1 = sckaccept;
         args.arg2 = clnt_addr;
 
         pthread_create(&server_thread,NULL,&SMTPServerHandler,(void*) &args);
@@ -215,7 +218,7 @@ int P01::DeliverEmail(string _Email[], string _Path)
         while((files = readdir(userdir)) != NULL)
         {
             string f = files->d_name;
-            if(f != "." && f != "..")
+            if(f != "." && f != ".." && f != "inbox")
             {
                 filenames.push_back(f);
             }
@@ -231,6 +234,7 @@ int P01::DeliverEmail(string _Email[], string _Path)
             lstFilename = filenames[filenames.size() - 1];
         }
         ostringstream result;
+        cout<<lstFilename<<endl;
         result << setfill('0') << setw(3) << to_string(stoi(lstFilename) + 1);
         string newfilename = result.str() + ".email";
         ofstream newfile;
@@ -248,24 +252,17 @@ int P01::DeliverEmail(string _Email[], string _Path)
 void *P01::SMTPServerHandler(void *_Arguments)
 {
     struct arg_struct *args = (struct arg_struct *)_Arguments;
-    int sckaccept = *(int *)args->arg1;
     struct sockaddr_in clnt_addr = args->arg2;
+    int sckaccept = args->arg1;
+    char ipaddr[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(clnt_addr.sin_addr),ipaddr,INET_ADDRSTRLEN);
+    cout<<"Opening SMTP Thread for client IP: "<<ipaddr<<endl;
     char hostname[255];
-    int getnameinfoValue = gethostname(hostname,sizeof(hostname));
-    if(getnameinfoValue == 0)
-    {
-        cout<<hostname<<endl;
-    }
-    else
-    {
-        cout<<"Reverse lookup failed"<<endl;
-        cout<<"Return value: "<< getnameinfoValue;
-        cout<<"Error: "<<gai_strerror(getnameinfoValue)<<endl;
-    }
     string msg = hostname;
     msg += " Haddock's SMTP Mail Service, ready at ";
     msg += GetCurrentTimeStamp();
-    SMTPSendResponse(&sckaccept,220,msg);    int helo_rsp = 0;
+    SMTPSendResponse(&sckaccept,220,msg);
+    int helo_rsp = 0;
     int mailfrom_rsp = 0;
     int rcptto_rsp = 0;
     string email[5]; 
@@ -273,9 +270,9 @@ void *P01::SMTPServerHandler(void *_Arguments)
     {
         char rcvBuffer[BUFFERSIZE];
         int receive = recv(sckaccept,rcvBuffer,BUFFERSIZE,0);
+        //cout<<rcvBuffer<<endl;
         if(receive > 0)
         {
-            cout<<"Receive: " << receive<<endl;
             string msg = "";
             for(int i = 0; i < receive; i++)
             {
@@ -285,7 +282,7 @@ void *P01::SMTPServerHandler(void *_Arguments)
                     msg += rcvBuffer[i];
                 }
             }
-            cout<<"Msg Received: "<<msg<< " Length: " << msg.length()<<endl; 
+            cout<<msg<<endl;
             vector<string>cmd;
             string cmd_entry = "";
             int firstSpace = msg.find_first_of(' ');
@@ -298,14 +295,10 @@ void *P01::SMTPServerHandler(void *_Arguments)
                 cmd.push_back(msg.substr(0,firstSpace));
                 cmd.push_back(msg.substr(firstSpace + 1, msg.length()));
             }
-            for(int i = 0; i < (int)cmd.size(); i++)
-            {
-                cout<<"CMD["<< i << "]: "<<cmd[i]<<endl;
-            }
-
-            cout<<":"<<msg<<":"<<endl;
             if(StrToUpper(cmd[0]) == "QUIT")
             {
+                SMTPSendResponse(&sckaccept,221);
+                cout<<"Closing SMTP Thread for client IP: "<<ipaddr<<endl;
                 close(sckaccept);
                 sckaccept = 0;            
             }
@@ -313,18 +306,16 @@ void *P01::SMTPServerHandler(void *_Arguments)
             {
                 string ip = inet_ntoa(clnt_addr.sin_addr);
                 helo_rsp = SMTPHelo(&sckaccept,hostname,"[" + ip + "]");
-                cout<<"HELO RSP: "<<helo_rsp<<endl;
             }
             else if(StrToUpper(cmd[0]) == "HELP")
             {
                 SMTPSendResponse(&sckaccept,502);
                 email[DATE] = GetCurrentTimeStamp();
-                email[SUBJECT] = "Hello";
-                email[TO] = "<bhubler@447f18.edu>";
-                email[FROM] = "<bhubler@siue.edu>";
-                email[MESSAGE] = "Hello,\n\nThis is a test.\n\nThanks,\n\n\nBen";
+                email[SUBJECT] = "The Last Unicorn";
+                email[TO] = "<b@447f18.edu>";
+                email[FROM] = "<bhubler@447f18.edu>";
+                email[MESSAGE] = "Dear Haddock,\n\nGlad to hear that you found the last Unicorn.  We are looking forward to your safe return.\n\nYours truly,\nTintin and Snowy.\n";
                 string recipient = GetUserName(email[TO]);
-                // cout<<"UserName: "<<recipient<<endl;
                 string userpath = path + "/" + recipient;
                 mkdir(userpath.c_str(),0777);
                 DeliverEmail(email,userpath);
@@ -385,15 +376,10 @@ void *P01::SMTPServerHandler(void *_Arguments)
             }
             else if(regex_match(msg,regex("^(RCPT)((.)+)?",std::regex_constants::icase)))
             {
-                cout<<"1:"<<msg<<":"<<endl;
-                cout<<"Test 1"<<endl;
                 if(mailfrom_rsp > 0)
                 {
-                    cout<<"Test 2"<<endl;
-                    cout<<"2:"<<msg<<":"<<endl;
                     if(regex_match(msg,regex("^(RCPT(\\s){1,}TO:){1}(<)?([\\w._%+-])+@{1}(447f18.edu){1}(>)?",std::regex_constants::icase)))
                     {
-                        cout<<"Test 3"<<endl;
                         int firstColon = msg.find_first_of(':');
                         string mailaddr = msg.substr(firstColon + 1,msg.length() - 1);
                         cout<<"RCPT Addr: "<<mailaddr<<endl;
@@ -431,7 +417,6 @@ void *P01::SMTPServerHandler(void *_Arguments)
                     }
                 }
             }
-            // else if(cmd[0] == "DATA")
             else if(regex_match(msg,regex("^(DATA)(\\s){0,}",std::regex::icase)))
             {
                 if(rcptto_rsp > 0)
@@ -448,6 +433,7 @@ void *P01::SMTPServerHandler(void *_Arguments)
                         char dataBuffer[BUFFERSIZE];
                         memset(&dataBuffer,0,sizeof(dataBuffer));
                         int receive = recv(sckaccept,dataBuffer,BUFFERSIZE,0);
+                        cout<<dataBuffer<<endl;
                         for(int i = 0; i < receive; i++)
                         {
                             if(dataBuffer[i] == 0)
@@ -537,21 +523,15 @@ void *P01::SMTPServerHandler(void *_Arguments)
             }
             else
             {
-                cout<<"Unknown Error"<<endl;
+                // cout<<"Unknown Error"<<endl;
+                SMTPSendResponse(&sckaccept,500);
+                // cout<<"Closing SMTP Thread for client IP: "<<ipaddr<<endl;
+                // close(sckaccept);
+                // sckaccept = 0;  
             }
-            // cout<<"End of if block"<<endl;
         }
-        // close(scklisten);
-        // close(sckbind);
-        // close(sck); 
     }
-    free(args->arg1);
     SMTPSendResponse(&sckaccept,221);
-    // cout<<"Date: "<<email[DATE]<<endl;
-    // cout<<"From: "<<email[FROM]<<endl;
-    // cout<<"To: "<<email[TO]<<endl;
-    // cout<<"Subject: "<<email[SUBJECT]<<endl;
-    // cout<<"Message: "<<email[MESSAGE]<<endl;
     return 0;
 }
 void P01::UDPServer(int _Port)
@@ -559,10 +539,6 @@ void P01::UDPServer(int _Port)
     //Create mail db directory structure
     char udpWorkingDirectory[FILENAME_MAX];
     getcwd(udpWorkingDirectory,FILENAME_MAX);
-    cout<<"Directory: "<<udpWorkingDirectory<<endl;
-    //string udppath = buff;
-    //udppath+="/db";
-    // mkdir(upppath.c_str(),0777);
 
     struct sockaddr_in address;
     address.sin_family = AF_INET;
@@ -570,10 +546,8 @@ void P01::UDPServer(int _Port)
     address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int sck = socket(PF_INET,SOCK_DGRAM,IPPROTO_UDP);
-    cout<< "Socket: " << sck << endl;
-    
-    int sckbind = bind(sck,(struct sockaddr *)&address,sizeof(address));
-    cout<< "Socket Bind: " << sckbind << endl;
+    bind(sck,(struct sockaddr *)&address,sizeof(address));
+    cout<< "Waiting for UDP Connections on port "<<_Port<<"\n"<<endl;
     while(true)
     {
         bool bGet = false;
@@ -591,7 +565,6 @@ void P01::UDPServer(int _Port)
         StringSplit(strBuffer,input,10);
         for(int i = 0; i < (int)input.size(); i++)
         {
-            // cout<<input[i];
             if(regex_match(input[i],regex("^(get ){1}(/db/)([\\w._%+-/])+( HTTP/1.1){1}$",regex::icase)))
             {
                 Request[GET] = input[i];
@@ -622,24 +595,36 @@ void P01::UDPServer(int _Port)
             string hostname = trim(Request[HOST].substr(colonFirst + 1,Request[HOST].length()));
             vector<string> parseGet;
             StringSplit(Request[GET],parseGet,32);
-            cout<<"Directory: "<<parseGet[1]<<endl;
-            cout<<"Response: "<<parseGet[2]<<endl;
-            cout<<"Server: "<<hostname<<endl;
-            cout<<"Last-Modified: "<<GetCurrentTimeStamp()<<endl;
+            string headers[6];
+            headers[RESPONSE] = parseGet[2];
+            headers[SERVER] = hostname;
+            headers[LASTMODIFIED] = GetCurrentTimeStamp();
+            headers[RETRIEVECOUNT] = to_string(count);
+            headers[CONTENTTYPE] = "text/plain";
+            
             string userDir = udpWorkingDirectory + rtrim(trim(parseGet[1],' '),'/');
             string userInbox = userDir + "/inbox";
-            cout<<userDir<<endl;
-            cout<<userInbox<<endl;
             mkdir(userDir.c_str(),0777);
             mkdir(userInbox.c_str(),0777);
-            for(int i = 0; i < count; i++)
+            vector<string> Emails;
+            vector<string> EmailFilenames;
+            RetrieveEmail(Emails,EmailFilenames,userDir,count);
+            for(int i = 0; i < (int)Emails.size(); i++)
             {
-
+                headers[MESSAGECOUNT] = to_string(i + 1);
+                string email = headers[RESPONSE] + "\n";
+                email += "Server: " + headers[HOST] + "\n";
+                email += "Last-Modified: " + headers[LASTMODIFIED] + "\n";
+                email += "Count: " + headers[RETRIEVECOUNT] + "\n";
+                email += "Content-Type: " + headers[CONTENTTYPE] + "\n";
+                email += "Message: " + headers[MESSAGECOUNT] + "\n\n";
+                email += Emails[i];
+                SaveRetrievedEmail(email,userInbox,EmailFilenames[i]);
+                UDPSendResponse(&sck,clnt_addr,email);
             }
-            string msg = Request[GET] + "\n" + Request[HOST] + "\n" + Request[COUNT] + "\n";
-            // sendto(sck,msg.c_str(),msg.length(),0,(struct sockaddr *) &clnt_addr,clnt_length);
-            UDPSendResponse(&sck,clnt_addr,msg);
-            cout<<"messages received: \n"<<msg<<endl;
+            char ipaddr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &(clnt_addr.sin_addr),ipaddr,INET_ADDRSTRLEN);
+            cout<<Emails.size()<<" UDP messages sent to client IP: "<<ipaddr<<endl;
         }
     }
 }
@@ -668,17 +653,17 @@ void P01::StringSplit(string _InputToSplit,vector<string> &_DelimitedOutput, cha
     }
 }
 
-int P01::RetrieveEmail(vector<string[2]>_Emails,string _Mailbox, int _Count)
+int P01::RetrieveEmail(vector<string> &_Emails,vector<string> &_EmailFilenames, string _Mailbox, int _Count)
 {
     DIR *userdir = opendir(_Mailbox.c_str());
     struct dirent *files;
     vector<string> filenames;
-    if(userdir != NULL)
+    if(userdir != NULL && _Count > 0)
     {
         while((files = readdir(userdir)) != NULL)
         {
             string f = files->d_name;
-            if(f != "." && f != ".." && f != "Inbox")
+            if(f != "." && f != ".." && f != "inbox")
             {
                 filenames.push_back(f);
             }
@@ -687,14 +672,12 @@ int P01::RetrieveEmail(vector<string[2]>_Emails,string _Mailbox, int _Count)
         for(int i = filenames.size() - 1;i >= 0; i--)
         {
             if(_Count > 0)
-            {
-                string email[2];
-                email[0] = filenames[i];
-                ifstream f(_Mailbox);
+            {                
+                ifstream f(_Mailbox + "/" + filenames[i]);
                 stringstream buffer;
                 buffer<<f.rdbuf();
-                email[1] = buffer.str();
-                _Emails.push_back(email);
+                _EmailFilenames.push_back(filenames[i]);
+                _Emails.push_back(buffer.str());
                 f.close();
             }
             else
@@ -703,6 +686,33 @@ int P01::RetrieveEmail(vector<string[2]>_Emails,string _Mailbox, int _Count)
             }
             _Count--;
         }
+        return 0;
+    }
+    return -1;
+}
+int P01::SaveRetrievedEmail(string _Email, string _Path, string _Filename)
+{
+    DIR *userdir = opendir(_Path.c_str());
+    // struct dirent *files;
+    vector<string> filenames;
+    if(userdir != NULL)
+    {
+        ostringstream result;
+        int lastPeriod = _Filename.find_last_of('.');
+        result << _Path + "/" + _Filename.substr(0,lastPeriod);
+        // cout<<result.str()<<endl;
+        string newfilename = result.str() + ".txt";
+        ofstream newfile;
+        cout<<newfilename<<endl;
+        newfile.open(newfilename);
+        // newfile <<_Headers[RESPONSE]<<endl;
+        // newfile <<"Server: "<<_Headers[HOST]<<endl;
+        // newfile <<"Last-Modified: "<<_Headers[LASTMODIFIED]<<endl;
+        // newfile <<"Count: "<<_Headers[COUNT]<<endl;
+        // newfile <<"Content-type: "<<_Headers[CONTENTTYPE]<<endl;
+        // newfile <<"Message: "<<_Headers[MESSAGE]<<endl<<endl;
+        newfile <<_Email;
+        newfile.close();
         return 0;
     }
     return -1;

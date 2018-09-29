@@ -22,5 +22,6 @@ namespace P01
     void UDPServer(int _Port);
     int UDPSendResponse(int *_ServerSocket,struct sockaddr_in _ClientAddr,std::string _Message);
     void StringSplit(std::string _InputToSplit, std::vector<std::string> &_DelimitedOutput, char _Delimiter);
-    int RetrieveEmail(std::vector<std::string[2]>_Emails,std::string _Mailbox, int _Count);
+    int RetrieveEmail(std::vector<std::string> &_Emails,std::vector<std::string> &_EmailFilenames,std::string _Mailbox, int _Count);
+    int SaveRetrievedEmail(std::string _Email, std::string _Path, std::string _Filename);
 }
