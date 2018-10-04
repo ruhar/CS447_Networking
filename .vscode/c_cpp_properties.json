@@ -4,7 +4,9 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/Program01/Client"
+                "${workspaceFolder}/Program01-2/Client",
+                "${workspaceFolder}/Program01-2/Common",
+                "${workspaceFolder}/Program01-2/Server"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

@@ -7,6 +7,8 @@ using namespace std;
 using namespace P01;
 int main(int argc, char const *argv[])
 {    
+    string serverip = argv[1];
+    string port = argv[2];
     string input = "";
     int inputValue = 0;
     while(inputValue != 3)
@@ -29,7 +31,8 @@ int main(int argc, char const *argv[])
         {
             case SEND:
                 //Run TCP Send EMail Client
-                SMTPSendEmail("127.0.0.1","8100");
+                // SMTPSendEmail("127.0.0.1","8100");
+                SMTPSendEmail(serverip,port);
                 break;
             case CHECK:
                 //Run UDP Check EMail Client

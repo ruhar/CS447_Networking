@@ -1,0 +1,4 @@
+# CS447_Networking
+Haddocks Email Server
+To compile server, go to Program01\Server, type make. run .\main.app <port>
+To compile client, go to Program01\Client, type make. run .\main.app <serverip> <port>
