@@ -3,10 +3,10 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/Program01-2/Client",
-                "${workspaceFolder}/Program01-2/Common",
-                "${workspaceFolder}/Program01-2/Server"
+                "${workspaceFolder}/Program01-2/**",
+                "${workspaceFolder}/Program01-2/src/Client",
+                "${workspaceFolder}/Program01-2/src/Common",
+                "${workspaceFolder}/Program01-2/src/Server"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

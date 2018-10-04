@@ -1,11 +1,11 @@
 #include <string>
-#include <common.hpp>
+#include "common.hpp"
 #include <regex>
+#include <iostream>
 
 using namespace std;
-using namespace cs447;
 
-string GetCurrentTimeStamp()
+string cs447::GetCurrentTimeStamp()
 {
     time_t _time = time(NULL);
     struct tm * currtime = localtime(&_time);
@@ -14,7 +14,7 @@ string GetCurrentTimeStamp()
 
     return regex_replace(time,crlf,"");
 }
-string StrToUpper(string _InputString)
+string cs447::StrToUpper(string _InputString)
 {
     string upper = "";
     for(int i = 0; i < (int)_InputString.size(); i++)
@@ -23,7 +23,7 @@ string StrToUpper(string _InputString)
     }
     return upper;
 }
-string ltrim(string _InputString, char _Character)
+string cs447::ltrim(string _InputString, char _Character)
 {       
     if(_InputString.length() > 0)
     {
@@ -42,7 +42,7 @@ string ltrim(string _InputString, char _Character)
         return _InputString;
 
 }
-string rtrim(string _InputString, char _Character)
+string cs447::rtrim(string _InputString, char _Character)
 {
     if(_InputString.length() > 0)
     {
@@ -60,14 +60,14 @@ string rtrim(string _InputString, char _Character)
         return _InputString;
     }
 }
-string trim(string _InputString, char _Character)
+string cs447::trim(string _InputString, char _Character)
 {
-    return cs447::rtrim(cs447::ltrim(_InputString,_Character),_Character);
+    return rtrim(ltrim(_InputString,_Character),_Character);
 }
-string GetUserName(string _EmailAddress)
+string cs447::GetUserName(string _EmailAddress)
 {
-    string username = cs447::ltrim(_EmailAddress);
-    username = cs447::ltrim(username,'<');
+    string username = ltrim(_EmailAddress);
+    username = ltrim(username,'<');
     int atsymbol = username.find_first_of('@');
     return username.substr(0, atsymbol);
 }
