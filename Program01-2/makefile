@@ -4,7 +4,7 @@ INC = -I ./src/Common -I ./src/Server -I ./src/Client
 all: server
 
 server: common.o server.o main.o 
-	g++ -g ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
+	g++ -g -pthread ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
 
 main.o: src/Server/main.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Server/main.cpp -o ./bin/main.o
