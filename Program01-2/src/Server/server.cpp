@@ -22,6 +22,11 @@ using namespace std;
 using namespace cs447;
 
 static int sckaccept;
+// struct smtpargs
+// {
+//     int *socket;
+
+// }
 void cs447::Hello()
 {
     cout<<"Welcome to the electronic age Captain!\n";
