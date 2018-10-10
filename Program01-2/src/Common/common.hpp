@@ -13,4 +13,5 @@
         string GetCurrentTimeStamp();
         string GetUserName(string _EmailAddress);
         string GetCurrentDirectory();
+        string GetHostName();
     }

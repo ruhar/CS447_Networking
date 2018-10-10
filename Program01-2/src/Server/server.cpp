@@ -1,6 +1,7 @@
 #include <string>
 #include "smtpargs.hpp"
 #include "server.hpp"
+#include "common.hpp"
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,7 +12,6 @@
 #include <unistd.h>
 #include <vector>
 #include <netdb.h>
-#include <ctime>
 #include <regex>
 #include <fstream>
 #include <sys/stat.h>
@@ -23,12 +23,12 @@ using namespace std;
 using namespace cs447;
 
 static int sckaccept;
+const int BUFFERSIZE = 10;
+enum {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
+enum {GET=0,HOST,COUNT};
+enum {RESPONSE=0,SERVER,LASTMODIFIED,RETRIEVECOUNT,CONTENTTYPE,MESSAGECOUNT};
 
-// struct smtpargs
-// {
-//     int socket;
-//     struct sockaddr_in caddress;
-// };
+
 void cs447::Hello()
 {
     cout<<"Welcome to the electronic age Captain!\n";
@@ -64,7 +64,7 @@ void cs447::SMTPServer(int _Port)
     {
         throw runtime_error("Unable to listien on port " + to_string(_Port));
     }
-
+    cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
     while(true)
     {
         pthread_t server_thread;
@@ -73,7 +73,7 @@ void cs447::SMTPServer(int _Port)
         sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
         if(sckaccept < 0)
         {
-            cout<<"Client connection refused."<<endl;
+            cout<<"Client connection refused from: "<<inet_ntoa(caddress.sin_addr)<<endl;
         }
         else
         {
@@ -86,11 +86,39 @@ void cs447::SMTPServer(int _Port)
 }
 void *cs447::SMTPServerHandler(void *_sckinfo)
 {
+    bool listening = true;
+    string hostname = GetHostName();    
     smtpargs *sckinfo = (smtpargs *)_sckinfo;
-    SMTPSendResponse(sckinfo->socket,100);
-    cout<<"Threading working"<<endl;
-    cout<<"caddress length: "<<sizeof(sckinfo->address);
-    cout<<"client address: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
+    string msg = hostname + " Haddock's SMTP Service. Ready at " + GetCurrentTimeStamp();
+    char buffer[BUFFERSIZE];
+    memset(buffer, 0, BUFFERSIZE);
+    SMTPSendResponse(sckinfo->socket,220, msg);
+    cout<<"Opening SMTP Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
+    while(listening)
+    {
+        int rcvdmsglength;
+        rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+        string rcvdmsg(buffer);
+        while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+        {
+            memset(buffer, 0, BUFFERSIZE);
+            rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+            rcvdmsg += buffer;
+        }
+        memset(buffer, 0, BUFFERSIZE);
+        SMTPSendResponse(sckinfo->socket,250,rcvdmsg);
+        if(regex_match(rcvdmsg,regex("^(quit)(\\s){0,}",regex::icase)))
+        {
+            SMTPSendResponse(sckinfo->socket,221,"Thank you for using Dr. C's Mail Services!");
+            listening = false;
+        }
+        else if(regex_match(rcvdmsg,regex("^(helo)(\\s){0,}",regex::icase)))
+        {
+
+        }
+    }
+    cout<<"Closing SMTP Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
+    close(sckinfo->socket);
     return 0;
 }
 int cs447::SMTPSendResponse(int &_ClientSocket, int _ResponseCode, string _Message)
@@ -139,5 +167,9 @@ int cs447::SMTPSendResponse(int &_ClientSocket, int _ResponseCode, string _Messa
     {
         return -1;
     }
+}
+bool cs447::SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress)
+{
+    int response = SMTPSendResponse(_ClientSocket,250,"Hello [" + inet_ntoa(_ClientAddress.sin_addr) + "]");
 }
 

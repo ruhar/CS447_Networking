@@ -12,8 +12,7 @@ int main(int argc, char const *argv[])
     Hello();    
     try
     {
-        // throw runtime_error("Fuck you bitch!");
-        SMTPServer(8100);
+        SMTPServer(stoi(argv[1]));
     }
     catch(const runtime_error &e)
     {

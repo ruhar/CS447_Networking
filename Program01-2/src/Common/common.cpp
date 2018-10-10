@@ -2,6 +2,7 @@
 #include "common.hpp"
 #include <regex>
 #include <iostream>
+#include <unistd.h>
 
 using namespace std;
 
@@ -70,4 +71,17 @@ string cs447::GetUserName(string _EmailAddress)
     username = ltrim(username,'<');
     int atsymbol = username.find_first_of('@');
     return username.substr(0, atsymbol);
+}
+string cs447::GetHostName()
+{
+    char hostname[255];
+    if(gethostname(hostname,255) == 0)
+    {
+        string hname(hostname);
+        return hname;
+    }
+    else
+    {
+        return "";
+    }
 }
