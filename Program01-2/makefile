@@ -3,8 +3,8 @@
 INC = -I ./src/Common -I ./src/Server -I ./src/Client
 all: server
 
-server: common.o server.o main.o 
-	g++ -g -pthread ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
+server: smtpargs.o common.o server.o main.o 
+	g++ -g -pthread ./bin/smtpargs.o ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
 
 main.o: src/Server/main.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Server/main.cpp -o ./bin/main.o
@@ -14,6 +14,9 @@ server.o: src/Server/server.cpp src/Server/server.hpp
 
 common.o: src/Common/common.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Common/common.cpp -o ./bin/common.o
+
+smtpargs.o: src/Common/smtpargs.cpp src/Common/smtpargs.hpp
+	g++ -c -Wall -g $(INC) src/Common/smtpargs.cpp -o ./bin/smtpargs.o
 
 clean:
 	rm ./bin/*.* ./server.app
