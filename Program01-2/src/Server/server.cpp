@@ -88,6 +88,8 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
 {
     bool listening = true;
     bool helosent = false;
+    bool mailfrom = false;
+    bool rcptto = false;
     string hostname = GetHostName();    
     smtpargs *sckinfo = (smtpargs *)_sckinfo;
     string msg = hostname + " Haddock's SMTP Service. Ready at " + GetCurrentTimeStamp();
@@ -117,13 +119,13 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
         {
             helosent = SMTPHelo(sckinfo->socket,sckinfo->address);
         }
-        else if(regex_match(rcvdmsg,regex("^(mail)( ){1,}",regex::icase)))
+        else if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(.){0,}(\\s){0,}",regex::icase)))
         {
             if(helosent)
             {
-                if(regex_match(rcvdmsg,regex("^(mail)( ){1,}(from:)( ){0,}",regex::icase)))
+                if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(from:)(.){0,}(\\s){0,}",regex::icase)))
                 {
-                    if(regex_match(rcvdmsg,regex("^(mail)( ){1,}(from:)( ){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}",regex::icase)))
+                    if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(from:)(\\s){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}(\\s){0,}",regex::icase)))
                     {
                         int firstcolon = rcvdmsg.find_first_of(':');
                         string email = rcvdmsg.substr(firstcolon + 1);
@@ -131,7 +133,9 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
                         email = trim(email);
                         email = ltrim(email,'<');
                         email = rtrim(email,'>');
-                        cout<<"Email From: "<<email;
+                        cout<<"Email From: "<<email<<endl;
+                        SMTPSendResponse(sckinfo->socket,250,"Email from accepted.");
+                        mailfrom = true;
                     }
                     else
                     {
@@ -149,34 +153,73 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
             }
 
         }
-        else if(regex_match(rcvdmsg,regex("^(data)(\\s){0,}",regex::icase)))
+        else if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
         {
-            SMTPSendResponse(sckinfo->socket,354);
-            bool dataentry = true;
-            memset(buffer,0,BUFFERSIZE);
-            rcvdmsg = "";
-            while(dataentry)
+            if(mailfrom)
             {
-                rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-                if(regex_match(buffer,regex("^(\\.\\r\\n)$",regex::icase))||
-                   regex_match(buffer,regex("^(\\.\\n)$",regex::icase)))
+                if(regex_match(rcvdmsg,regex("(rcpt)(\\s){1,}(to:)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
                 {
-                    dataentry = false;
-                    // cout<<rcvdmsg<<endl;
-                } 
+                    if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){1,}(to:)(\\s){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}(\\s){0,}",regex::icase)))
+                    {
+                        int firstcolon = rcvdmsg.find_first_of(':');
+                        string email = rcvdmsg.substr(firstcolon + 1);
+                        email = trim(email, 10);
+                        email = trim(email);
+                        email = ltrim(email,'<');
+                        email = rtrim(email,'>');
+                        cout<<"Email To: "<<email<<endl;
+                        SMTPSendResponse(sckinfo->socket,250,"Email recipient accepted.");
+                        rcptto = true;
+                    }
+                    else
+                    {
+                        SMTPSendResponse(sckinfo->socket,501,"Invalid email address.");
+                    }
+                }
                 else
                 {
-                    rcvdmsg += buffer;
+                    SMTPSendResponse(sckinfo->socket,501,"Invalid Argument - must be \"rcpt to:\"");
                 }
-                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
-                {
-                    memset(buffer, 0, BUFFERSIZE);
-                    rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-                    rcvdmsg += buffer;
-                }
-                memset(buffer, 0, BUFFERSIZE);
             }
-            SMTPSendResponse(sckinfo->socket,250,"Data entry complete");
+            else
+            {
+                SMTPSendResponse(sckinfo->socket,503,"Send MAIL FROM: first");
+            }
+        }
+        else if(regex_match(rcvdmsg,regex("^(data)(\\s){0,}",regex::icase)))
+        {
+            if(rcptto)
+            {
+                SMTPSendResponse(sckinfo->socket,354);
+                bool dataentry = true;
+                memset(buffer,0,BUFFERSIZE);
+                rcvdmsg = "";
+                while(dataentry)
+                {
+                    rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+                    if(regex_match(buffer,regex("^(\\.\\r\\n)$",regex::icase))||
+                    regex_match(buffer,regex("^(\\.\\n)$",regex::icase)))
+                    {
+                        dataentry = false;
+                    } 
+                    else
+                    {
+                        rcvdmsg += buffer;
+                    }
+                    while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                    {
+                        memset(buffer, 0, BUFFERSIZE);
+                        rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+                        rcvdmsg += buffer;
+                    }
+                    memset(buffer, 0, BUFFERSIZE);
+                }
+                SMTPSendResponse(sckinfo->socket,250,"Data entry complete");
+            }
+            else
+            {
+                SMTPSendResponse(sckinfo->socket,503,"Send RCPT TO: first");
+            }
         }
         else
         {
