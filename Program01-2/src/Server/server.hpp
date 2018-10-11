@@ -11,7 +11,7 @@ namespace cs447
     void Hello();
     void Goodbye();
     void SMTPServer(int _Port);
-    bool SMTPHelo(int &_ClientSocket, sockaddr_in &_ClientAddress);
+    bool SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress);
     void SMTPMailFrom();
     int SMTPSendResponse(int &_ClientSocket, int _ResponseCode, std::string _Message="");
     int DeliverEmail(std::string _Email[],std::string _Path);

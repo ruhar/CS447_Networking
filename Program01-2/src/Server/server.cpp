@@ -87,6 +87,7 @@ void cs447::SMTPServer(int _Port)
 void *cs447::SMTPServerHandler(void *_sckinfo)
 {
     bool listening = true;
+    bool helosent = false;
     string hostname = GetHostName();    
     smtpargs *sckinfo = (smtpargs *)_sckinfo;
     string msg = hostname + " Haddock's SMTP Service. Ready at " + GetCurrentTimeStamp();
@@ -106,7 +107,7 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
-        SMTPSendResponse(sckinfo->socket,250,rcvdmsg);
+        cout<<rcvdmsg<<endl;
         if(regex_match(rcvdmsg,regex("^(quit)(\\s){0,}",regex::icase)))
         {
             SMTPSendResponse(sckinfo->socket,221,"Thank you for using Dr. C's Mail Services!");
@@ -114,7 +115,72 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
         }
         else if(regex_match(rcvdmsg,regex("^(helo)(\\s){0,}",regex::icase)))
         {
+            helosent = SMTPHelo(sckinfo->socket,sckinfo->address);
+        }
+        else if(regex_match(rcvdmsg,regex("^(mail)( ){1,}",regex::icase)))
+        {
+            if(helosent)
+            {
+                if(regex_match(rcvdmsg,regex("^(mail)( ){1,}(from:)( ){0,}",regex::icase)))
+                {
+                    if(regex_match(rcvdmsg,regex("^(mail)( ){1,}(from:)( ){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}",regex::icase)))
+                    {
+                        int firstcolon = rcvdmsg.find_first_of(':');
+                        string email = rcvdmsg.substr(firstcolon + 1);
+                        email = trim(email, 10);
+                        email = trim(email);
+                        email = ltrim(email,'<');
+                        email = rtrim(email,'>');
+                        cout<<"Email From: "<<email;
+                    }
+                    else
+                    {
+                        SMTPSendResponse(sckinfo->socket,501,"Invalid email address.");
+                    }
+                }
+                else
+                {
+                    SMTPSendResponse(sckinfo->socket,501,"Invalid Argument - must be \"mail from:\"");
+                }
+            }
+            else
+            {
+                SMTPSendResponse(sckinfo->socket,503,"Send HELO first");
+            }
 
+        }
+        else if(regex_match(rcvdmsg,regex("^(data)(\\s){0,}",regex::icase)))
+        {
+            SMTPSendResponse(sckinfo->socket,354);
+            bool dataentry = true;
+            memset(buffer,0,BUFFERSIZE);
+            rcvdmsg = "";
+            while(dataentry)
+            {
+                rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+                if(regex_match(buffer,regex("^(\\.\\r\\n)$",regex::icase))||
+                   regex_match(buffer,regex("^(\\.\\n)$",regex::icase)))
+                {
+                    dataentry = false;
+                    // cout<<rcvdmsg<<endl;
+                } 
+                else
+                {
+                    rcvdmsg += buffer;
+                }
+                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                {
+                    memset(buffer, 0, BUFFERSIZE);
+                    rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+                    rcvdmsg += buffer;
+                }
+                memset(buffer, 0, BUFFERSIZE);
+            }
+            SMTPSendResponse(sckinfo->socket,250,"Data entry complete");
+        }
+        else
+        {
+            SMTPSendResponse(sckinfo->socket,500);
         }
     }
     cout<<"Closing SMTP Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
@@ -170,6 +236,15 @@ int cs447::SMTPSendResponse(int &_ClientSocket, int _ResponseCode, string _Messa
 }
 bool cs447::SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress)
 {
-    int response = SMTPSendResponse(_ClientSocket,250,"Hello [" + inet_ntoa(_ClientAddress.sin_addr) + "]");
+    string clientinfo(inet_ntoa(_ClientAddress.sin_addr));
+    int response = SMTPSendResponse(_ClientSocket,250,"Hello [" + clientinfo + "]");
+    if(response < 0)
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
 }
 
