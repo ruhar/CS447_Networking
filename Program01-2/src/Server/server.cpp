@@ -109,7 +109,6 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
-        cout<<rcvdmsg<<endl;
         if(regex_match(rcvdmsg,regex("^(quit)(\\s){0,}",regex::icase)))
         {
             SMTPSendResponse(sckinfo->socket,221,"Thank you for using Dr. C's Mail Services!");
@@ -133,7 +132,6 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
                         email = trim(email);
                         email = ltrim(email,'<');
                         email = rtrim(email,'>');
-                        cout<<"Email From: "<<email<<endl;
                         SMTPSendResponse(sckinfo->socket,250,"Email from accepted.");
                         mailfrom = true;
                     }
@@ -167,7 +165,6 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
                         email = trim(email);
                         email = ltrim(email,'<');
                         email = rtrim(email,'>');
-                        cout<<"Email To: "<<email<<endl;
                         SMTPSendResponse(sckinfo->socket,250,"Email recipient accepted.");
                         rcptto = true;
                     }
