@@ -2,6 +2,7 @@
 #include <string>
 #include <regex>
 #include <vector>
+#include <iostream>
 
 using namespace std;
 using namespace cs447;
@@ -51,22 +52,31 @@ string rtspheaders::PrintHeaders()
 bool rtspheaders::SetSensor(string _Sensors)
 {
     bool set = false;
-    if(regex_match(_Sensors,regex("^(([otp*]){1},([otp]){1},([otp]){1})|^(([otp*]){1},([otp]){1})|^(([otp*]){1})",regex::icase)))
+    cout<<"1"<<endl;
+    if(regex_match(_Sensors,regex("^(([otp*]){1},([otp]){1},([otp]){1})|^(([otp*]){1},([otp]){1})|^(([otp*]){1})(\\s){0,}",regex::icase)))
     {
+        cout<<"2"<<endl;
+        Sensors[(int)SENSOR::OXYGEN] = false;
+        Sensors[(int)SENSOR::PRESSURE] = false;
+        Sensors[(int)SENSOR::TEMPERATURE] = false;
         Sensor = _Sensors;        
         set = true;
-        if(_Sensors.find_first_of('*') || _Sensors.find_first_of('o') || _Sensors.find_first_of('O'))
+        if(regex_match(_Sensors,regex("[o*]{0,}",regex::icase)))
         {
             Sensors[(int)SENSOR::OXYGEN] = true;
+            cout<<"Oxygen"<<endl;
         }
-        if(_Sensors.find_first_of('*') || _Sensors.find_first_of('p') || _Sensors.find_first_of('P'))
+        if(regex_match(_Sensors,regex("[p*]{0,}",regex::icase)))
         {
             Sensors[(int)SENSOR::PRESSURE] = true;
+            cout<<"Pressure"<<endl;
         }
-        if(_Sensors.find_first_of('*') || _Sensors.find_first_of('t') || _Sensors.find_first_of('T'))
+        if(regex_match(_Sensors,regex("[t*]{0,}",regex::icase)))
         {
             Sensors[(int)SENSOR::TEMPERATURE] = true;
+            cout<<"Temperature"<<endl;
         }
+        cout<<"3"<<endl;
     }
     return set;
 }

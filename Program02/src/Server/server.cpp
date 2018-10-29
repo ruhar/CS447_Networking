@@ -371,8 +371,46 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
             RTSPSendResponse(socket,200,teardownHeader);
             listening = false;
         }
-        else if(regex_match(rcvdmsg,regex("^(helo)(\\s){0,}",regex::icase)))
+        else if(regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}\\/ rtsp\\/2.0(\\s){1,}",regex::icase)))
         {
+            rtspheaders setupHeader;
+            do
+            {
+                int rcvdmsglength;
+                memset(buffer, 0, BUFFERSIZE);
+                rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+                string rcvdmsg(buffer);
+                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                {
+                    memset(buffer, 0, BUFFERSIZE);
+                    rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+                    rcvdmsg += buffer;
+                }
+                if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
+                {
+                    cout<<"CSEQ"<<endl;
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
+                    setupHeader.CSeq = trim(rcvdmsg);
+                    cout<<setupHeader.PrintHeaders();
+                }
+                if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
+                {
+                    cout<<"SENSOR"<<endl;
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(sensor:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
+                    cout<<rcvdmsg<<endl;
+                    setupHeader.SetSensor(trim(rcvdmsg));
+                    cout<<setupHeader.PrintHeaders();
+                }
+                cout<<rcvdmsg;                
+            }while(!regex_match(buffer,regex("^(\\r\\n)$",regex::icase))&&
+                    !regex_match(buffer,regex("^(\\n)$",regex::icase)));
+
+            //setupHeader.CSeq = "2";
+            RTSPSendResponse(socket,200,setupHeader);
         }
         else if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(.){0,}(\\s){0,}",regex::icase)))
         {
