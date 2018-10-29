@@ -1,10 +1,10 @@
-#makefile for server.cpp in P01
+#makefile for server.cpp in P02
 # all: server client
 INC = -I ./src/Common -I ./src/Server -I ./src/Client
 all: server
 
-server: smtpargs.o common.o server.o main.o 
-	g++ -g -pthread ./bin/smtpargs.o ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
+server: rstpheaders.o tcpargs.o common.o server.o main.o 
+	g++ -g -pthread ./bin/rstpheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
 
 main.o: src/Server/main.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Server/main.cpp -o ./bin/main.o
@@ -15,8 +15,11 @@ server.o: src/Server/server.cpp src/Server/server.hpp
 common.o: src/Common/common.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Common/common.cpp -o ./bin/common.o
 
-smtpargs.o: src/Common/smtpargs.cpp src/Common/smtpargs.hpp
-	g++ -c -Wall -g $(INC) src/Common/smtpargs.cpp -o ./bin/smtpargs.o
+tcpargs.o: src/Common/tcpargs.cpp src/Common/tcpargs.hpp
+	g++ -c -Wall -g $(INC) src/Common/tcpargs.cpp -o ./bin/tcpargs.o
+
+rstpheaders.o: src/Common/rstpheaders.cpp src/Common/rstpheaders.hpp
+	g++ -c -Wall -g $(INC) src/Common/rstpheaders.cpp -o ./bin/rstpheaders.o
 
 clean:
 	rm ./bin/*.* ./server.app

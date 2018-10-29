@@ -3,6 +3,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include "tcpargs.hpp" 
+#include "rstpheaders.hpp"
 
 namespace cs447
 {
@@ -13,6 +14,7 @@ namespace cs447
     bool SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress);
     void SMTPMailFrom();
     int SMTPSendResponse(int &_ClientSocket, int _ResponseCode, std::string _Message="");
+    int RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rstpheaders _Headers);
     int DeliverEmail(std::string _Email[],std::string _Path);
     void *SMTPServerHandler(void *_sckinfo);
     void *RTSPServerHandler(void *_sckinfo);

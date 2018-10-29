@@ -1,7 +1,8 @@
 #include <string>
 #include "server.hpp"
 #include "common.hpp"
-#include "tcppargs.hpp"
+#include "tcpargs.hpp"
+#include "rstpheaders.hpp"
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -27,7 +28,6 @@ const int BUFFERSIZE = 10;
 enum {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
 enum {GET=0,HOST,COUNT};
 enum {RESPONSE=0,SERVER,LASTMODIFIED,RETRIEVECOUNT,CONTENTTYPE,MESSAGECOUNT};
-
 
 void cs447::Hello()
 {
@@ -76,7 +76,7 @@ void cs447::RTSPServer(int _Port)
         }
         else
         {
-            smtpargs sckinfo;
+            tcpargs sckinfo;
             sckinfo.address = caddress;
             sckinfo.socket = sckaccept;
             pthread_create(&server_thread,NULL,&RTSPServerHandler,(void *) &sckinfo);
@@ -121,7 +121,7 @@ void cs447::SMTPServer(int _Port)
         }
         else
         {
-            smtpargs sckinfo;
+            tcpargs sckinfo;
             sckinfo.address = caddress;
             sckinfo.socket = sckaccept;
             pthread_create(&server_thread,NULL,&SMTPServerHandler,(void *) &sckinfo);
@@ -135,7 +135,7 @@ void *cs447::SMTPServerHandler(void *_sckinfo)
     bool mailfrom = false;
     bool rcptto = false;
     string hostname = GetHostName();    
-    smtpargs *sckinfo = (smtpargs *)_sckinfo;
+    tcpargs *sckinfo = (tcpargs *)_sckinfo;
     string msg = hostname + " Haddock's SMTP Service. Ready at " + GetCurrentTimeStamp();
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
@@ -336,12 +336,15 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     bool listening = true;
 
     string hostname = GetHostName();    
-    //smtpargs *sckinfo = (smtpargs *)_sckinfo;
-    string msg = hostname + " Haddock's SMTP Service. Ready at " + GetCurrentTimeStamp();
+    tcpargs *sckinfo = (tcpargs *)_sckinfo;
+    string msg = hostname + " Haddock's RTSP Service. Ready at " + GetCurrentTimeStamp();
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
-    SMTPSendResponse(sckinfo->socket,220, msg);
+    rstpheaders connHeader;
+    connHeader.CSeq = "0";
+    connHeader.Date = GetCurrentTimeStamp();
     cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
+    RTSPSendResponse(sckinfo->socket,200,connHeader);
     while(listening)
     {
         int rcvdmsglength;
@@ -354,114 +357,24 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
-        if(regex_match(rcvdmsg,regex("^(quit)(\\s){0,}",regex::icase)))
+        if(regex_match(rcvdmsg,regex("^(teardown)(\\s){0,}",regex::icase)))
         {
-            SMTPSendResponse(sckinfo->socket,221,"Thank you for using Dr. C's Mail Services!");
+            rstpheaders teardownHeader;
+            teardownHeader.CSeq = "1";
+            RTSPSendResponse(sckinfo->socket,200,teardownHeader);
             listening = false;
         }
         else if(regex_match(rcvdmsg,regex("^(helo)(\\s){0,}",regex::icase)))
         {
-            helosent = SMTPHelo(sckinfo->socket,sckinfo->address);
         }
         else if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(.){0,}(\\s){0,}",regex::icase)))
         {
-            if(helosent)
-            {
-                if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(from:)(.){0,}(\\s){0,}",regex::icase)))
-                {
-                    if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(from:)(\\s){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}(\\s){0,}",regex::icase)))
-                    {
-                        int firstcolon = rcvdmsg.find_first_of(':');
-                        string email = rcvdmsg.substr(firstcolon + 1);
-                        email = trim(email, 10);
-                        email = trim(email);
-                        email = ltrim(email,'<');
-                        email = rtrim(email,'>');
-                        SMTPSendResponse(sckinfo->socket,250,"Email from accepted.");
-                        mailfrom = true;
-                    }
-                    else
-                    {
-                        SMTPSendResponse(sckinfo->socket,501,"Invalid email address.");
-                    }
-                }
-                else
-                {
-                    SMTPSendResponse(sckinfo->socket,501,"Invalid Argument - must be \"mail from:\"");
-                }
-            }
-            else
-            {
-                SMTPSendResponse(sckinfo->socket,503,"Send HELO first");
-            }
-
         }
         else if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
         {
-            if(mailfrom)
-            {
-                if(regex_match(rcvdmsg,regex("(rcpt)(\\s){1,}(to:)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
-                {
-                    if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){1,}(to:)(\\s){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}(\\s){0,}",regex::icase)))
-                    {
-                        int firstcolon = rcvdmsg.find_first_of(':');
-                        string email = rcvdmsg.substr(firstcolon + 1);
-                        email = trim(email, 10);
-                        email = trim(email);
-                        email = ltrim(email,'<');
-                        email = rtrim(email,'>');
-                        SMTPSendResponse(sckinfo->socket,250,"Email recipient accepted.");
-                        rcptto = true;
-                    }
-                    else
-                    {
-                        SMTPSendResponse(sckinfo->socket,501,"Invalid email address.");
-                    }
-                }
-                else
-                {
-                    SMTPSendResponse(sckinfo->socket,501,"Invalid Argument - must be \"rcpt to:\"");
-                }
-            }
-            else
-            {
-                SMTPSendResponse(sckinfo->socket,503,"Send MAIL FROM: first");
-            }
         }
         else if(regex_match(rcvdmsg,regex("^(data)(\\s){0,}",regex::icase)))
         {
-            if(rcptto)
-            {
-                SMTPSendResponse(sckinfo->socket,354);
-                bool dataentry = true;
-                memset(buffer,0,BUFFERSIZE);
-                rcvdmsg = "";
-                while(dataentry)
-                {
-                    rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-                    if(regex_match(buffer,regex("^(\\.\\r\\n)$",regex::icase))||
-                    regex_match(buffer,regex("^(\\.\\n)$",regex::icase)))
-                    {
-                        dataentry = false;
-                    } 
-                    else
-                    {
-                        rcvdmsg += buffer;
-                    }
-                    while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
-                    {
-                        memset(buffer, 0, BUFFERSIZE);
-                        rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-                        rcvdmsg += buffer;
-                    }
-                    memset(buffer, 0, BUFFERSIZE);
-                }
-                SMTPSendResponse(sckinfo->socket,250,"Data entry complete");
-            }
-            else
-            {
-                SMTPSendResponse(sckinfo->socket,503,"Send RCPT TO: first");
-            }
         }
         else
         {
@@ -472,3 +385,28 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     close(sckinfo->socket);
     return 0;
 }
+int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rstpheaders _Headers)
+{
+    string msg = "RTSP/2.0 ";
+    switch (_ResponseCode)
+    {
+        case 200:
+            msg += "200\n";
+            msg += _Headers.PrintHeaders();
+            break;
+        default:
+            msg += _ResponseCode + "\n";
+            break;
+    }
+    if(msg.length() > 0)
+    {
+        char msgSend[msg.length()];
+        strcpy(msgSend,msg.c_str());
+        return send(_ClientSocket,msgSend,sizeof(msgSend),0);
+    }
+    else
+    {
+        return -1;
+    }
+}
+
