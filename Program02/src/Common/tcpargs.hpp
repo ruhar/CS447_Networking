@@ -1,16 +1,16 @@
-#ifndef smtpargs_hpp
-#define smtpargs_hpp
+#ifndef tcpargs_hpp
+#define tcpargs_hpp
 #include <netinet/in.h>
 
 namespace cs447
 {
-    class smtpargs
+    class tcpargs
     {
     public:
         int socket;
         sockaddr_in address; 
-        smtpargs();
-        ~smtpargs();
+        tcpargs();
+        ~tcpargs();
     };
 }
 

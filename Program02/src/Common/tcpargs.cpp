@@ -1,13 +1,13 @@
-#include "smtpargs.hpp"
+#include "tcpargs.hpp"
 #include <netinet/in.h>
 
 using namespace std;
 using namespace cs447;
 
-smtpargs::smtpargs()
+tcpargs::tcpargs()
 {    
 }
 
-smtpargs::~smtpargs()
+tcpargs::~tcpargs()
 {
 }

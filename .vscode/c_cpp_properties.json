@@ -6,7 +6,8 @@
                 "${workspaceFolder}/Program01-2/**",
                 "${workspaceFolder}/Program01-2/src/Client",
                 "${workspaceFolder}/Program01-2/src/Common",
-                "${workspaceFolder}/Program01-2/src/Server"
+                "${workspaceFolder}/Program01-2/src/Server",
+                "${workspaceFolder}/Program02/src/Common"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
