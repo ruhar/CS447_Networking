@@ -2,7 +2,7 @@
 #include "server.hpp"
 #include "common.hpp"
 #include "tcpargs.hpp"
-#include "rstpheaders.hpp"
+#include "rtspheaders.hpp"
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -45,7 +45,7 @@ void cs447::RTSPServer(int _Port)
     saddress.sin_port = htons(_Port);
     saddress.sin_addr.s_addr = htonl(INADDR_ANY);  
     
-    int sck = socket(PF_INET,SOCK_STREAM,0);
+    int sck = socket(PF_INET,SOCK_STREAM,IPPROTO_TCP);
     if(sck < 0)
     {
         throw runtime_error("Unable to start socket.");
@@ -63,11 +63,14 @@ void cs447::RTSPServer(int _Port)
         throw runtime_error("Unable to listien on port " + to_string(_Port));
     }
     cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
+    struct sockaddr_in caddress;
+    vector<pthread_t> server_thread;
 
     while(true)
     {
-        pthread_t server_thread;
-        struct sockaddr_in caddress;
+        pthread_t newthread;
+        server_thread.push_back(newthread);
+
         socklen_t caddr_length = sizeof(caddress);
         sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
         if(sckaccept < 0)
@@ -79,8 +82,9 @@ void cs447::RTSPServer(int _Port)
             tcpargs sckinfo;
             sckinfo.address = caddress;
             sckinfo.socket = sckaccept;
-            pthread_create(&server_thread,NULL,&RTSPServerHandler,(void *) &sckinfo);
+            pthread_create(&server_thread.back(),NULL,RTSPServerHandler,(void *) &sckinfo);
         }
+        cout<<"Thread count: "<< sizeof(server_thread)<<endl;
     }   
 }
 void cs447::SMTPServer(int _Port)
@@ -336,32 +340,35 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     bool listening = true;
 
     string hostname = GetHostName();    
-    tcpargs *sckinfo = (tcpargs *)_sckinfo;
+    //tcpargs *sckinfo = (tcpargs *)_sckinfo;
+    int socket = ((tcpargs *)_sckinfo)->socket;
+    sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
     string msg = hostname + " Haddock's RTSP Service. Ready at " + GetCurrentTimeStamp();
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
-    rstpheaders connHeader;
+    rtspheaders connHeader;
     connHeader.CSeq = "0";
     connHeader.Date = GetCurrentTimeStamp();
-    cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
-    RTSPSendResponse(sckinfo->socket,200,connHeader);
+    cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
+    cout<<" Socket: "<<socket<<endl;
+    RTSPSendResponse(socket,200,connHeader);
     while(listening)
     {
         int rcvdmsglength;
-        rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+        rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
         string rcvdmsg(buffer);
         while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
         {
             memset(buffer, 0, BUFFERSIZE);
-            rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
+            rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
         if(regex_match(rcvdmsg,regex("^(teardown)(\\s){0,}",regex::icase)))
         {
-            rstpheaders teardownHeader;
+            rtspheaders teardownHeader;
             teardownHeader.CSeq = "1";
-            RTSPSendResponse(sckinfo->socket,200,teardownHeader);
+            RTSPSendResponse(socket,200,teardownHeader);
             listening = false;
         }
         else if(regex_match(rcvdmsg,regex("^(helo)(\\s){0,}",regex::icase)))
@@ -378,14 +385,14 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         }
         else
         {
-            SMTPSendResponse(sckinfo->socket,500);
+            SMTPSendResponse(socket,500);
         }
     }
-    cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
-    close(sckinfo->socket);
+    cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
+    close(socket);
     return 0;
 }
-int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rstpheaders _Headers)
+int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rtspheaders _Headers)
 {
     string msg = "RTSP/2.0 ";
     switch (_ResponseCode)

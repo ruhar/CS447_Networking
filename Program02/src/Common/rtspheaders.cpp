@@ -1,4 +1,4 @@
-#include "rstpheaders.hpp"
+#include "rtspheaders.hpp"
 #include <string>
 #include <regex>
 #include <vector>
@@ -6,7 +6,7 @@
 using namespace std;
 using namespace cs447;
 
-rstpheaders::rstpheaders()
+rtspheaders::rtspheaders()
 {
     CSeq = "";
     Date = "";
@@ -22,11 +22,11 @@ rstpheaders::rstpheaders()
     Sensors.push_back(false);
 }
 
-rstpheaders::~rstpheaders()
+rtspheaders::~rtspheaders()
 {
 }
 
-string rstpheaders::PrintHeaders()
+string rtspheaders::PrintHeaders()
 {
 
     string value = "";
@@ -48,7 +48,7 @@ string rstpheaders::PrintHeaders()
     }
     return value;
 }
-bool rstpheaders::SetSensor(string _Sensors)
+bool rtspheaders::SetSensor(string _Sensors)
 {
     bool set = false;
     if(regex_match(_Sensors,regex("^(([otp*]){1},([otp]){1},([otp]){1})|^(([otp*]){1},([otp]){1})|^(([otp*]){1})",regex::icase)))

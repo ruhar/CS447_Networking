@@ -3,8 +3,8 @@
 INC = -I ./src/Common -I ./src/Server -I ./src/Client
 all: server
 
-server: rstpheaders.o tcpargs.o common.o server.o main.o 
-	g++ -g -pthread ./bin/rstpheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
+server: rtspheaders.o tcpargs.o common.o server.o main.o 
+	g++ -g -pthread ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server.o ./bin/main.o -o ./server.app
 
 main.o: src/Server/main.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Server/main.cpp -o ./bin/main.o
@@ -18,8 +18,8 @@ common.o: src/Common/common.cpp src/Common/common.hpp
 tcpargs.o: src/Common/tcpargs.cpp src/Common/tcpargs.hpp
 	g++ -c -Wall -g $(INC) src/Common/tcpargs.cpp -o ./bin/tcpargs.o
 
-rstpheaders.o: src/Common/rstpheaders.cpp src/Common/rstpheaders.hpp
-	g++ -c -Wall -g $(INC) src/Common/rstpheaders.cpp -o ./bin/rstpheaders.o
+rtspheaders.o: src/Common/rtspheaders.cpp src/Common/rtspheaders.hpp
+	g++ -c -Wall -g $(INC) src/Common/rtspheaders.cpp -o ./bin/rtspheaders.o
 
 clean:
 	rm ./bin/*.* ./server.app

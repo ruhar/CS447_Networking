@@ -1,12 +1,12 @@
-#ifndef rstpheaders_hpp
-#define rstpheaders_hpp
+#ifndef rtspheaders_hpp
+#define rtspheaders_hpp
 #include <string>
 #include <vector>
 
 namespace cs447
 {
     enum class SENSOR{OXYGEN=0, PRESSURE, TEMPERATURE};
-    class rstpheaders
+    class rtspheaders
     {
         public:
             std::string Sensor;
@@ -16,8 +16,8 @@ namespace cs447
             std::string PrintHeaders();
             std::vector<bool> Sensors;
             bool SetSensor(std::string _Sensors);
-            rstpheaders();
-            ~rstpheaders();
+            rtspheaders();
+            ~rtspheaders();
     };
 }
 
