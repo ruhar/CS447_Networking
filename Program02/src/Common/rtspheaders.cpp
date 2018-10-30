@@ -33,19 +33,19 @@ string rtspheaders::PrintHeaders()
     string value = "";
     if(CSeq != "")
     {
-        value += "CSeq: " + CSeq + "\n";
+        value += "CSeq: " + CSeq + "\r\n";
     }
     if(Date != "")
     {
-        value += "Date: " + Date + "\n";
+        value += "Date: " + Date + "\r\n";
     }
     if(Transport != "")
     {
-        value += "Transport: " + Transport + "\n";
+        value += "Transport: " + Transport + "\r\n";
     }
     if(Sensor != "")
     {
-        value += "Sensor: " + Sensor + "\n";
+        value += "Sensor: " + Sensor + "\r\n";
     }
     return value;
 }

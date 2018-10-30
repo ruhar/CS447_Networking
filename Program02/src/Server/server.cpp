@@ -313,9 +313,21 @@ int cs447::SMTPSendResponse(int &_ClientSocket, int _ResponseCode, string _Messa
     }
     if(msg.length() > 0)
     {
+        // char msgSend[msg.length()];
+        // strcpy(msgSend,msg.c_str());
+        // return send(_ClientSocket,msgSend,sizeof(msgSend),0);
         char msgSend[msg.length()];
         strcpy(msgSend,msg.c_str());
-        return send(_ClientSocket,msgSend,sizeof(msgSend),0);
+        int retval = 90210;
+        try
+        {
+            retval = send(_ClientSocket,msgSend,sizeof(msgSend),0);
+        }
+        catch(const std::exception& e)
+        {
+            cout << e.what() << '\n';
+        }        
+        return retval;
     }
     else
     {
@@ -340,7 +352,6 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     bool listening = true;
 
     string hostname = GetHostName();    
-    //tcpargs *sckinfo = (tcpargs *)_sckinfo;
     int socket = ((tcpargs *)_sckinfo)->socket;
     sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
     string msg = hostname + " Haddock's RTSP Service. Ready at " + GetCurrentTimeStamp();
@@ -352,10 +363,18 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
     cout<<" Socket: "<<socket<<endl;
     RTSPSendResponse(socket,200,connHeader);
-    while(listening)
+    int lostconn = 0;
+    while(listening && lostconn < 10)
     {
         int rcvdmsglength;
-        rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+        try
+        {
+            rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+        }
+        catch(exception er)
+        {
+            cout<<er.what();
+        }
         string rcvdmsg(buffer);
         while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
         {
@@ -366,6 +385,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         memset(buffer, 0, BUFFERSIZE);
         if(regex_match(rcvdmsg,regex("^(teardown)(\\s){0,}",regex::icase)))
         {
+            lostconn = 0;
             rtspheaders teardownHeader;
             teardownHeader.CSeq = "1";
             RTSPSendResponse(socket,200,teardownHeader);
@@ -374,6 +394,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         else if(regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}\\/ rtsp\\/2.0(\\s){1,}",regex::icase)) ||
                 regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\/ rtsp\\/2.0(\\s){1,}")))
         {
+            lostconn = 0;
             rtspheaders setupHeader;
             bool dataentry = true;
             do
@@ -411,18 +432,13 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
 
             RTSPSendResponse(socket,200,setupHeader);
         }
-        else if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(.){0,}(\\s){0,}",regex::icase)))
+        else if(rcvdmsglength == 0)
         {
-        }
-        else if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
-        {
-        }
-        else if(regex_match(rcvdmsg,regex("^(data)(\\s){0,}",regex::icase)))
-        {
+            lostconn++;
         }
         else
         {
-            SMTPSendResponse(socket,500);
+            RTSPSendResponse(socket,200,connHeader);
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
@@ -435,18 +451,28 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rtspheaders _
     switch (_ResponseCode)
     {
         case 200:
-            msg += "200\n";
+            msg += "200\r\n";
             msg += _Headers.PrintHeaders();
             break;
         default:
-            msg += _ResponseCode + "\n";
+            msg += _ResponseCode + "\r\n";
             break;
     }
     if(msg.length() > 0)
     {
         char msgSend[msg.length()];
         strcpy(msgSend,msg.c_str());
-        return send(_ClientSocket,msgSend,sizeof(msgSend),0);
+        int retval = 90210;
+        try
+        {
+            retval = send(_ClientSocket,msgSend,sizeof(msgSend),0);
+        }
+        catch(const std::exception& e)
+        {
+            cout << e.what() << '\n';
+        }
+        
+        return retval;
     }
     else
     {
