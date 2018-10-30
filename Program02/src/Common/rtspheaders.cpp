@@ -52,31 +52,25 @@ string rtspheaders::PrintHeaders()
 bool rtspheaders::SetSensor(string _Sensors)
 {
     bool set = false;
-    cout<<"1"<<endl;
     if(regex_match(_Sensors,regex("^(([otp*]){1},([otp]){1},([otp]){1})|^(([otp*]){1},([otp]){1})|^(([otp*]){1})(\\s){0,}",regex::icase)))
     {
-        cout<<"2"<<endl;
         Sensors[(int)SENSOR::OXYGEN] = false;
         Sensors[(int)SENSOR::PRESSURE] = false;
         Sensors[(int)SENSOR::TEMPERATURE] = false;
         Sensor = _Sensors;        
         set = true;
-        if(regex_match(_Sensors,regex("[o*]{0,}",regex::icase)))
+        if(regex_search(_Sensors,regex("[o*]{1}",regex::icase)))
         {
             Sensors[(int)SENSOR::OXYGEN] = true;
-            cout<<"Oxygen"<<endl;
         }
-        if(regex_match(_Sensors,regex("[p*]{0,}",regex::icase)))
+        if(regex_search(_Sensors,regex("[p*]{1}",regex::icase)))
         {
             Sensors[(int)SENSOR::PRESSURE] = true;
-            cout<<"Pressure"<<endl;
         }
-        if(regex_match(_Sensors,regex("[t*]{0,}",regex::icase)))
+        if(regex_search(_Sensors,regex("[t*]{1}",regex::icase)))
         {
             Sensors[(int)SENSOR::TEMPERATURE] = true;
-            cout<<"Temperature"<<endl;
         }
-        cout<<"3"<<endl;
     }
     return set;
 }
