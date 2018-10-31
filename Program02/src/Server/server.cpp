@@ -352,7 +352,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     bool listening = true;
 
     string hostname = GetHostName();    
-    int socket = ((tcpargs *)_sckinfo)->socket;
+    int sck = ((tcpargs *)_sckinfo)->socket;
     sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
     string msg = hostname + " Haddock's RTSP Service. Ready at " + GetCurrentTimeStamp();
     char buffer[BUFFERSIZE];
@@ -361,15 +361,15 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     connHeader.CSeq = "0";
     connHeader.Date = GetCurrentTimeStamp();
     cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
-    cout<<" Socket: "<<socket<<endl;
-    RTSPSendResponse(socket,200,connHeader);
+    cout<<" Socket: "<<sck<<endl;
+    RTSPSendResponse(sck,200,connHeader);
     int lostconn = 0;
     while(listening && lostconn < 10)
     {
         int rcvdmsglength;
         try
         {
-            rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+            rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
         }
         catch(exception er)
         {
@@ -379,7 +379,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
         {
             memset(buffer, 0, BUFFERSIZE);
-            rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+            rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
@@ -388,7 +388,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
             lostconn = 0;
             rtspheaders teardownHeader;
             teardownHeader.CSeq = "1";
-            RTSPSendResponse(socket,200,teardownHeader);
+            RTSPSendResponse(sck,200,teardownHeader);
             listening = false;
         }
         else if(regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}\\/ rtsp\\/2.0(\\s){1,}",regex::icase)) ||
@@ -401,12 +401,12 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
             {
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
-                rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
-                    rcvdmsglength = recv(socket,buffer,BUFFERSIZE,0);
+                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -430,7 +430,43 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                 }
             }while(dataentry);
 
-            RTSPSendResponse(socket,200,setupHeader);
+            RTSPSendResponse(sck,200,setupHeader);
+        }
+        else if(regex_match(rcvdmsg,regex("play(\\s){0,}",regex::icase)))
+        {
+            cout<<"Playing to 127.0.0.1:8100:UDP"<<endl;
+            lostconn = 0;
+            rtspheaders setupHeader;
+            bool dataentry = true;
+            do
+            {
+                int rcvdmsglength;
+                memset(buffer, 0, BUFFERSIZE);
+                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                string rcvdmsg(buffer);
+                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                {
+                    memset(buffer, 0, BUFFERSIZE);
+                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsg += buffer;
+                }
+                rcvdmsglength = rcvdmsg.length();
+                //Send to UDP client
+                int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+                struct sockaddr_in saddress;
+                saddress.sin_family = AF_INET; 
+                saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+                saddress.sin_port = htons(8100); 
+                char sndbuffer[rcvdmsglength];
+                strcpy(sndbuffer,rcvdmsg.c_str());
+                sendto(udpsck, sndbuffer, rcvdmsglength, 0,(struct sockaddr *) &saddress, sizeof(saddress));
+                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                {
+                    dataentry = false;
+                }
+            }while(dataentry);
+
+            RTSPSendResponse(sck,200,setupHeader);
         }
         else if(rcvdmsglength == 0)
         {
@@ -438,11 +474,11 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         }
         else
         {
-            RTSPSendResponse(socket,200,connHeader);
+            RTSPSendResponse(sck,200,connHeader);
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
-    close(socket);
+    close(sck);
     return 0;
 }
 int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rtspheaders _Headers)
