@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include "common.hpp"
-#include "controlclient.hpp"
+#include "controller.hpp"
 #include <stdexcept>
 
 using namespace std;

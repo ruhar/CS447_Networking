@@ -12,7 +12,7 @@ int main(int argc, char const *argv[])
     Hello();    
     try
     {
-        RTSPServer(stoi(argv[1]));
+        RTSPServer(stoi(argv[1]),argv[2],argv[3],argv[4]);
     }
     catch(const runtime_error &e)
     {

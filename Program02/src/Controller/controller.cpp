@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <string>
-#include "controlclient.hpp"
+#include "controller.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
