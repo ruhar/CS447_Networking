@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <thread>
 #include <unistd.h>
+#include <regex>
+#include "common.hpp"
+#include <vector>
 
 using namespace std;
 using namespace cs447;
@@ -43,7 +46,9 @@ void cs447::RTSPReceiverClient(int _ServerPort)
     memset(buffer,0,BUFFERSIZE);
     struct sockaddr_in caddress;
     socklen_t clength = sizeof(caddress);
-    cout<<"Waiting for data..."<<endl;
+    cout<<"12345678901234567890 12345678901234567890 12345678901234567890"<<endl;
+    cout<<"Oxygen               Temperature          Pressure"<<endl;
+    cout<<"--------------------|--------------------|--------------------"<<endl;
     while(listen)
     {
         int rcvdmsglength = recvfrom(sck, buffer, BUFFERSIZE, 0,(struct sockaddr *) &caddress, &clength);
@@ -55,6 +60,18 @@ void cs447::RTSPReceiverClient(int _ServerPort)
             rcvdmsg += buffer;
         }
         memset(buffer,0,BUFFERSIZE);
+        vector<string> rcvdsplit;
+        while(rcvdmsg != "")
+        StringSplit(rcvdmsg,rcvdsplit,';');
+        bitset<5> oxygen;
+        for(int i = 0; i <= rcvdsplit.size(); i++)
+        {
+            if(regex_match(rcvdsplit[i],regex("79:([01]{5})")))
+            {
+                oxygen = bitset<5>(rcvdsplit[i]);
+            }            
+        }
+
         cout<<rcvdmsg<<endl;
     }
 }
