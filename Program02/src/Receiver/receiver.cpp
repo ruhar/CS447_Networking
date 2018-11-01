@@ -16,7 +16,7 @@
 using namespace std;
 using namespace cs447;
 
-const int BUFFERSIZE = 10;
+const int BUFFERSIZE = 64;
 void cs447::Hello()
 {
     cout<<"Welcome to the electronic age Captain!\n";
@@ -46,7 +46,7 @@ void cs447::RTSPReceiverClient(int _ServerPort)
     memset(buffer,0,BUFFERSIZE);
     struct sockaddr_in caddress;
     socklen_t clength = sizeof(caddress);
-    cout<<"12345678901234567890 12345678901234567890 12345678901234567890"<<endl;
+    // cout<<"12345678901234567890 12345678901234567890 12345678901234567890"<<endl;
     cout<<"Oxygen               Temperature          Pressure"<<endl;
     cout<<"--------------------|--------------------|--------------------"<<endl;
     while(listen)
@@ -61,17 +61,70 @@ void cs447::RTSPReceiverClient(int _ServerPort)
         }
         memset(buffer,0,BUFFERSIZE);
         vector<string> rcvdsplit;
-        while(rcvdmsg != "")
         StringSplit(rcvdmsg,rcvdsplit,';');
         bitset<5> oxygen;
-        for(int i = 0; i <= rcvdsplit.size(); i++)
+        bitset<11> pressure;
+        bitset<8> temperature;
+        for(uint i = 0; i <= rcvdsplit.size(); i++)
         {
             if(regex_match(rcvdsplit[i],regex("79:([01]{5})")))
             {
+                rcvdsplit[i] = regex_replace(rcvdsplit[i],regex("79:"),"");
                 oxygen = bitset<5>(rcvdsplit[i]);
-            }            
+            } 
+            else if(regex_match(rcvdsplit[i],regex("84:([01]{8})")))
+            {
+                rcvdsplit[i] = regex_replace(rcvdsplit[i],regex("84:"),"");
+                temperature = bitset<8>(rcvdsplit[i]);
+            }   
+            else if(regex_match(rcvdsplit[i],regex("80:([01]{11})")))
+            {
+                rcvdsplit[i] = regex_replace(rcvdsplit[i],regex("80:"),"");
+                pressure = bitset<11>(rcvdsplit[i]);
+            }        
         }
-
-        cout<<rcvdmsg<<endl;
+        string outputmsg = "";
+        double oxygenval = oxygen.to_ulong();
+        double ostar = 20.0 * (oxygenval/16.0);
+        for(int i = 0;i<20;i++)
+        {
+            if(i < ostar)
+            {
+                outputmsg += "*";
+            }
+            else
+            {
+                outputmsg += " ";
+            }
+        }
+        outputmsg += "|";
+        double temperatureval = temperature.to_ulong();
+        double tstar = 20.0 * (temperatureval/128.0);
+        for(int i = 0;i<20;i++)
+        {
+            if(i < tstar)
+            {
+                outputmsg += "*";
+            }
+            else
+            {
+                outputmsg += " ";
+            }
+        }
+        outputmsg += "|";
+        double pressureval = pressure.to_ulong();
+        double pstar = 20.0 * (pressureval/1050.0);
+        for(int i = 0;i<20;i++)
+        {
+            if(i < pstar)
+            {
+                outputmsg += "*";
+            }
+            else
+            {
+                outputmsg += " ";
+            }
+        }
+        cout<<outputmsg<<endl;
     }
 }

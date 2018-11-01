@@ -85,3 +85,23 @@ string cs447::GetHostName()
         return "";
     }
 }
+void cs447::StringSplit(string _InputToSplit,vector<string> &_DelimitedOutput, char _Delimiter)
+{
+    string line = "";
+    for(int i = 0;i < (int)_InputToSplit.length(); i++)
+    {
+        line += _InputToSplit[i];
+        if(_InputToSplit[i] == _Delimiter)
+        {
+            line = line.substr(0,line.length() - 1);
+            line = regex_replace(line,regex("\n"),"");
+            _DelimitedOutput.push_back(line);
+            line = "";
+        }
+    }
+    if(line != "")
+    {
+        line = regex_replace(line,regex("\n"),"");
+        _DelimitedOutput.push_back(line);
+    }
+}

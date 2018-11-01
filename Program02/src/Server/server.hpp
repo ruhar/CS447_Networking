@@ -24,8 +24,10 @@ namespace cs447
     void stringSplit(std::string _InputToSplit, std::vector<std::string> &_DelimitedOutput, char _Delimiter);
     int RetrieveEmail(std::vector<std::string> &_Emails,std::vector<std::string> &_EmailFilenames,std::string _Mailbox, int _Count);
     int SaveRetrievedEmail(std::string _Email, std::string _Path, std::string _Filename);
-    void ReadOxygenSensor(std::vector<std::bitset<5>> &_SensorData, std::string _FileName);
-    void ReadTemperatureSensor(std::vector<std::bitset<8> > &_SensorData, std::string _FileName);
-    void ReadPressureSensor(std::vector<std::bitset<11> > &_SensorData, std::string _FileName);
+    void ReadOxygenSensor(std::vector<std::bitset<5>> &_SensorData, std::string _FileName, int &_MaxReadings);
+    void ReadTemperatureSensor(std::vector<std::bitset<8> > &_SensorData, std::string _FileName, int &_MaxReadings);
+    void ReadPressureSensor(std::vector<std::bitset<11> > &_SensorData, std::string _FileName, int &_MaxReadings);
+    void RTSPPlay(tcpargs _SocketInfo);
+    void SensorIncrement(bool &_Playing, int &_Counter, int &_Size);
 
 }

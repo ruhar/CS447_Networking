@@ -21,18 +21,32 @@
 #include <thread>
 #include <math.h>
 #include <bitset>
+#include <chrono>
 
 using namespace std;
 using namespace cs447;
 
 static int sckaccept;
-const int BUFFERSIZE = 10;
+const int BUFFERSIZE = 64;
+const uint OXYGENMAX = 16;
+const uint PRESSUREMAX = 1050;
+const uint TEMPERATUREMAX = 255;
 enum {DATE = 0,FROM,TO,SUBJECT,MESSAGE};
 enum {GET=0,HOST,COUNT};
 enum {RESPONSE=0,SERVER,LASTMODIFIED,RETRIEVECOUNT,CONTENTTYPE,MESSAGECOUNT};
 vector<bitset<5>> oxygen;
 vector<bitset<11>> pressure;
 vector<bitset<8>> temperature;
+bool oplaying = false;
+bool tplaying = false;
+bool pplaying = false;
+int curroxygen = 0;
+int currtemperature = 0;
+int currpressure = 0;
+int maxoxygen = 0;
+int maxtemperature = 0;
+int maxpressure = 0;
+
 void cs447::Hello()
 {
     cout<<"Welcome to the electronic age Captain!\n";
@@ -45,10 +59,15 @@ void cs447::Goodbye()
 void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, string _PressureFile)
 {
     // cout<<"Reading sensor data..."<<endl;
-    thread o(ReadOxygenSensor,std::ref(oxygen),_OxygenFile);
-    thread p(ReadPressureSensor,std::ref(pressure),_PressureFile);
-    thread t(ReadTemperatureSensor,std::ref(temperature),_TemperatureFile);
+    thread o(ReadOxygenSensor,std::ref(oxygen),_OxygenFile,std::ref(maxoxygen));
+    thread p(ReadPressureSensor,std::ref(pressure),_PressureFile,std::ref(maxpressure));
+    thread t(ReadTemperatureSensor,std::ref(temperature),_TemperatureFile,std::ref(maxtemperature));
+    thread oinc(SensorIncrement,std::ref(oplaying),std::ref(curroxygen),std::ref(maxoxygen));
+    thread pinc(SensorIncrement,std::ref(pplaying),std::ref(currpressure),std::ref(maxpressure));
+    thread tinc(SensorIncrement,std::ref(tplaying),std::ref(currtemperature),std::ref(maxtemperature));
 
+
+    // bool &_Playing, int &_Counter, int &_Size
     // cout<<"Oxygen Count: "<< oxygen.size()<<endl;
     // cout<<"Pressure Count: "<< pressure.size()<<endl;
     // cout<<"Temperature Count: "<< temperature.size()<<endl;
@@ -454,11 +473,10 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         else if(regex_match(rcvdmsg,regex("play(\\s){0,}",regex::icase)))
         {
             cout<<"Playing to 127.0.0.1:8100:UDP"<<endl;
-            // vector<bitset<5>> oxygen;
-            // ReadOxygenSensor(oxygen,"./oxygen.bin");
             lostconn = 0;
             rtspheaders setupHeader;
-            int dataentry = 5;
+            int dataentry = 15;
+            oplaying = true;
             do
             {
                 // int rcvdmsglength;
@@ -478,19 +496,22 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                 saddress.sin_family = AF_INET; 
                 saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
                 saddress.sin_port = htons(8100); 
-                char sndbuffer[BUFFERSIZE];
-                cout<<oxygen[dataentry].to_ulong()<<"|"<<oxygen[dataentry].to_string()<<endl;
-                // strcpy(sndbuffer,oxygen[dataentry].to_string().c_str());
-                // sendto(udpsck, sndbuffer, BUFFERSIZE, 0,(struct sockaddr *) &saddress, sizeof(saddress));
+                // char sndbuffer[BUFFERSIZE];
+                // cout<<oxygen[dataentry].to_ulong()<<"|"<<oxygen[dataentry].to_string()<<endl;
+                string sending = "79:" + oxygen[dataentry].to_string() + ";84:" + temperature[dataentry].to_string() + ";80:" + pressure[dataentry].to_string();// +"\r\n";
+                cout<<sending<<endl;
+                char sndbuffer[sending.length()];
+                strcpy(sndbuffer,sending.c_str());
+                sendto(udpsck, sndbuffer, sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
                 // if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
                 // {
                 //     dataentry = false;
                 // }
                 dataentry--;
             }while(dataentry >= 0);
-            cout<<"Oxygen Count: "<< oxygen.size()<<endl;
-            cout<<"Pressure Count: "<< pressure.size()<<endl;
-            cout<<"Temperature Count: "<< temperature.size()<<endl;
+            // cout<<"Oxygen Count: "<< oxygen.size()<<endl;
+            // cout<<"Pressure Count: "<< pressure.size()<<endl;
+            // cout<<"Temperature Count: "<< temperature.size()<<endl;
 
             RTSPSendResponse(sck,200,setupHeader);
         }
@@ -541,32 +562,48 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rtspheaders _
         return -1;
     }
 }
-void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName)
+void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName, int &_MaxReadings)
 {
     ifstream sensor(_FileName, ios::binary|ios::in);
     char c;
     string bitstring = "00000";
     int count = 4;
+    // int stop = 0;
     while(sensor.get(c))
     {
         unsigned char uc = static_cast<unsigned char>(c);
+        // cout<<c<<"|"<<uc<<endl;
         for(int i = 0; i<8;i++)
         {
             int remainder = uc % 2;
+            // cout<<remainder;
             bitstring[count] = to_string(remainder)[0];
             count--;
             if(count < 0)
             {
                 std::bitset<5> newData (bitstring);
-                _SensorData.push_back(newData);
+                if(newData.to_ulong() <= OXYGENMAX)
+                {
+                    _SensorData.push_back(newData);
+                    // cout<<endl<<newData.to_string()<<endl;
+                    _MaxReadings++;
+                }
+                else
+                {
+                    newData = bitset<5>("10000");
+                    _SensorData.push_back(newData);
+                    _MaxReadings++;
+                }
                 bitstring = "00000";
                 count = 4;
             }
             uc = (uc - remainder) / 2;
         }
+        // cout<<endl;
+        // stop++;
     }
 }
-void cs447::ReadPressureSensor(vector<bitset<11>> &_SensorData, string _FileName)
+void cs447::ReadPressureSensor(vector<bitset<11>> &_SensorData, string _FileName, int &_MaxReadings)
 {
     ifstream sensor(_FileName, ios::binary|ios::in);
     char c;
@@ -583,7 +620,10 @@ void cs447::ReadPressureSensor(vector<bitset<11>> &_SensorData, string _FileName
             if(count < 0)
             {
                 bitset<11> newData (bitstring);
-                _SensorData.push_back(newData);
+                //if(newData.to_ulong() <= PRESSUREMAX)
+                {
+                    _SensorData.push_back(newData);
+                }
                 bitstring = "00000000000";
                 count = 10;
             }
@@ -591,7 +631,7 @@ void cs447::ReadPressureSensor(vector<bitset<11>> &_SensorData, string _FileName
         }
     }
 }
-void cs447::ReadTemperatureSensor(vector<bitset<8>> &_SensorData, string _FileName)
+void cs447::ReadTemperatureSensor(vector<bitset<8>> &_SensorData, string _FileName, int &_MaxReadings)
 {
     ifstream sensor(_FileName, ios::binary|ios::in);
     char c;
@@ -608,11 +648,47 @@ void cs447::ReadTemperatureSensor(vector<bitset<8>> &_SensorData, string _FileNa
             if(count < 0)
             {
                 bitset<8> newData (bitstring);
-                _SensorData.push_back(newData);
+                newData.set(7,0);//Ignore most significant bit per Dr. Gamage
+                //if(newData.to_ulong() <= TEMPERATUREMAX)
+                {
+                    _SensorData.push_back(newData);
+                }
                 bitstring = "00000000";
                 count = 7;
             }
             uc = (uc - remainder) / 2;
         }
+    }
+}
+void cs447::RTSPPlay(tcpargs _SocketInfo)
+{
+    int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct sockaddr_in saddress = _SocketInfo.address;
+    saddress.sin_family = AF_INET; 
+    saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+    saddress.sin_port = htons(8100); 
+    // char sndbuffer[BUFFERSIZE];
+    // cout<<oxygen[dataentry].to_ulong()<<"|"<<oxygen[dataentry].to_string()<<endl;
+    // string sending = "79:" + oxygen[dataentry].to_string() + ";84:" + temperature[dataentry].to_string() + ";80:" + pressure[dataentry].to_string();// +"\r\n";
+    // cout<<sending<<endl;
+    // char sndbuffer[sending.length()];
+    // strcpy(sndbuffer,sending.c_str());
+    // sendto(udpsck, sndbuffer, sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
+}
+void cs447::SensorIncrement(bool &_Playing, int &_Counter, int &_Size)
+{
+    std::chrono::seconds duration(3);
+    while(true)
+    {
+        if(_Playing && _Counter < _Size)
+        {
+            cout<<"Counter: "<<_Counter<<endl;
+            _Counter++;
+        }
+        else
+        {
+            _Counter = 0;
+        }
+        this_thread::sleep_for(duration);
     }
 }

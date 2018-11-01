@@ -14,7 +14,7 @@
 using namespace std;
 using namespace cs447;
 
-const int BUFFERSIZE = 10;
+const int BUFFERSIZE = 64;
 
 void cs447::Hello()
 {
