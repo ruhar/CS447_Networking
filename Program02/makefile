@@ -3,8 +3,8 @@
 INC = -I ./src/Common -I ./src/Server -I ./src/ControlClient -I ./src/Receiver
 all: server controller receiver
 
-server: rtspheaders.o tcpargs.o common.o server.o servermain.o 
-	g++ -g -pthread ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server/server.o ./bin/server/main.o -o ./server.app
+server: sensorcontrolclient.o sensorcontrol.o rtspheaders.o tcpargs.o common.o server.o servermain.o 
+	g++ -g -pthread ./bin/server/sensorcontrolclient.o ./bin/server/sensorcontrol.o ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server/server.o ./bin/server/main.o -o ./server.app
 
 controller: rtspheaders.o tcpargs.o common.o controller.o controllermain.o
 	g++ -g -pthread ./bin/tcpargs.o ./bin/common.o ./bin/controller/controller.o ./bin/controller/main.o -o ./controller.app
@@ -38,6 +38,12 @@ tcpargs.o: src/Common/tcpargs.cpp src/Common/tcpargs.hpp
 
 rtspheaders.o: src/Common/rtspheaders.cpp src/Common/rtspheaders.hpp
 	g++ -c -Wall -g $(INC) src/Common/rtspheaders.cpp -o ./bin/rtspheaders.o
+
+sensorcontrol.o: src/Server/SensorControl.cpp src/Server/SensorControl.hpp
+	g++ -c -Wall -g $(INC) src/Server/SensorControl.cpp -o ./bin/server/sensorcontrol.o
+
+sensorcontrolclient.o: src/Server/SensorControlClient.cpp src/Server/SensorControlClient.hpp
+	g++ -c -Wall -g $(INC) src/Server/SensorControlClient.cpp -o ./bin/server/sensorcontrolclient.o
 
 clean:
 	rm ./bin/*.* ./bin/controller/*.* ./bin/server/*.* ./bin/receiver/*.* ./server.app ./receiver.app ./controller.app

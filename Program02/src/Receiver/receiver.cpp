@@ -99,7 +99,7 @@ void cs447::RTSPReceiverClient(int _ServerPort)
         }
         outputmsg += "|";
         double temperatureval = temperature.to_ulong();
-        double tstar = 20.0 * (temperatureval/128.0);
+        double tstar = 20.0 * (temperatureval/127.0);
         for(int i = 0;i<20;i++)
         {
             if(i < tstar)

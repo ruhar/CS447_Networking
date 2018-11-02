@@ -3,6 +3,8 @@
 #include "common.hpp"
 #include "tcpargs.hpp"
 #include "rtspheaders.hpp"
+#include "SensorControl.hpp"
+#include "SensorControlClient.hpp"
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -37,15 +39,13 @@ enum {RESPONSE=0,SERVER,LASTMODIFIED,RETRIEVECOUNT,CONTENTTYPE,MESSAGECOUNT};
 vector<bitset<5>> oxygen;
 vector<bitset<11>> pressure;
 vector<bitset<8>> temperature;
-bool oplaying = false;
-bool tplaying = false;
-bool pplaying = false;
 int curroxygen = 0;
 int currtemperature = 0;
 int currpressure = 0;
 int maxoxygen = 0;
 int maxtemperature = 0;
 int maxpressure = 0;
+SensorControl sControl;
 
 void cs447::Hello()
 {
@@ -58,26 +58,13 @@ void cs447::Goodbye()
 
 void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, string _PressureFile)
 {
-    // cout<<"Reading sensor data..."<<endl;
     thread o(ReadOxygenSensor,std::ref(oxygen),_OxygenFile,std::ref(maxoxygen));
     thread p(ReadPressureSensor,std::ref(pressure),_PressureFile,std::ref(maxpressure));
     thread t(ReadTemperatureSensor,std::ref(temperature),_TemperatureFile,std::ref(maxtemperature));
-    thread oinc(SensorIncrement,std::ref(oplaying),std::ref(curroxygen),std::ref(maxoxygen));
-    thread pinc(SensorIncrement,std::ref(pplaying),std::ref(currpressure),std::ref(maxpressure));
-    thread tinc(SensorIncrement,std::ref(tplaying),std::ref(currtemperature),std::ref(maxtemperature));
+    thread oinc(SensorIncrement,std::ref(sControl.oplaying),std::ref(curroxygen),std::ref(maxoxygen));
+    thread pinc(SensorIncrement,std::ref(sControl.pplaying),std::ref(currpressure),std::ref(maxpressure));
+    thread tinc(SensorIncrement,std::ref(sControl.tplaying),std::ref(currtemperature),std::ref(maxtemperature));
 
-
-    // bool &_Playing, int &_Counter, int &_Size
-    // cout<<"Oxygen Count: "<< oxygen.size()<<endl;
-    // cout<<"Pressure Count: "<< pressure.size()<<endl;
-    // cout<<"Temperature Count: "<< temperature.size()<<endl;
-    // o.join();
-    // p.join();
-    // t.join();
-    // cout<<"Oxygen Count: "<< oxygen.size()<<endl;
-    // cout<<"Pressure Count: "<< pressure.size()<<endl;
-    // cout<<"Temperature Count: "<< temperature.size()<<endl;
-    // cout<<"...Sensor reading complete."<<endl;
     struct sockaddr_in saddress;
     saddress.sin_family = AF_INET;
     saddress.sin_port = htons(_Port);
@@ -111,6 +98,7 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
 
         socklen_t caddr_length = sizeof(caddress);
         sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
+
         if(sckaccept < 0)
         {
             cout<<"Client connection refused from: "<<inet_ntoa(caddress.sin_addr)<<endl;
@@ -122,7 +110,6 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
             sckinfo.socket = sckaccept;
             pthread_create(&server_thread.back(),NULL,RTSPServerHandler,(void *) &sckinfo);
         }
-        cout<<"Thread count: "<< sizeof(server_thread)<<endl;
     }   
 }
 void cs447::SMTPServer(int _Port)
@@ -385,17 +372,31 @@ bool cs447::SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress)
         return true;
     }
 }
+
 void *cs447::RTSPServerHandler(void *_sckinfo)
 {
     bool listening = true;
+    rtspheaders setupHeader;
+    rtspheaders playHeader;
+    rtspheaders pauseHeader;
+    rtspheaders connHeader;
+    int sequence = 0;
+
 
     string hostname = GetHostName();    
     int sck = ((tcpargs *)_sckinfo)->socket;
     sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
+
+    struct sockaddr_in addr;
+    socklen_t addr_size = sizeof(struct sockaddr_in);
+    int res = getsockname(sck, (struct sockaddr *)&addr, &addr_size);
+    string serverIP = inet_ntoa(addr.sin_addr);
+    string serverPort = to_string(ntohs(addr.sin_port));
+
+    sControl.AddClient(sck);
     string msg = hostname + " Haddock's RTSP Service. Ready at " + GetCurrentTimeStamp();
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
-    rtspheaders connHeader;
     connHeader.CSeq = "0";
     connHeader.Date = GetCurrentTimeStamp();
     cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
@@ -429,11 +430,10 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
             RTSPSendResponse(sck,200,teardownHeader);
             listening = false;
         }
-        else if(regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}\\/ rtsp\\/2.0(\\s){1,}",regex::icase)) ||
-                regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\/ rtsp\\/2.0(\\s){1,}")))
+        else if(regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
+                regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
         {
             lostconn = 0;
-            rtspheaders setupHeader;
             bool dataentry = true;
             do
             {
@@ -454,6 +454,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
                     setupHeader.CSeq = trim(rcvdmsg);
+                    sequence = stoi(setupHeader.CSeq);
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -462,58 +463,129 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
                     setupHeader.SetSensor(trim(rcvdmsg));
                 }
+                if(regex_match(rcvdmsg,regex("(transport:){1}( ){0,}(UDP;){1}(unicast;){1}(destaddr=\":){1}[0-9]{1,5}(\"){1}(\\s){0,}",regex::icase)))
+                {
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(transport:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
+                    vector<string> transport;
+                    StringSplit(rcvdmsg,transport,';');
+                    setupHeader.TransportInfo.Protocol = transport[0];
+                    setupHeader.TransportInfo.Transmission = transport[1]; 
+                    transport[1] = regex_replace(transport[1],regex("(destaddr=\":)",regex::icase),"");
+                    transport[1] = regex_replace(transport[1],regex("(\")",regex::icase),"");
+                    setupHeader.TransportInfo.DestPort = transport[1];
+                    setupHeader.TransportInfo.SrcAddress = serverIP;
+                    setupHeader.TransportInfo.SrcPort = serverPort;
+                }
+                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                {
+                    dataentry = false;
+                }
+            }while(dataentry);
+            // setupHeader.TransportInfo.SrcAddress
+            RTSPSendResponse(sck,200,setupHeader);
+            sequence++;
+        }
+        else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
+                regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
+        {
+            cout<<"O:"<<maxoxygen<<"T:"<<maxtemperature<<"P:"<<maxpressure<<endl;
+            lostconn = 0;
+            bool dataentry = true;
+            do
+            {
+                int rcvdmsglength;
+                memset(buffer, 0, BUFFERSIZE);
+                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                string rcvdmsg(buffer);
+                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                {
+                    memset(buffer, 0, BUFFERSIZE);
+                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsg += buffer;
+                }
+                rcvdmsglength = rcvdmsg.length();
+                if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
+                {
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
+                    playHeader.CSeq = trim(rcvdmsg);
+                    sequence = stoi(playHeader.CSeq);
+                }
+                if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
+                {
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(sensor:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
+                    playHeader.SetSensor(trim(rcvdmsg));
+                }
                 if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
                 {
                     dataentry = false;
                 }
             }while(dataentry);
 
-            RTSPSendResponse(sck,200,setupHeader);
-        }
-        else if(regex_match(rcvdmsg,regex("play(\\s){0,}",regex::icase)))
-        {
+            RTSPSendResponse(sck,200,playHeader);
+            sequence++;
+
+            sControl.SetPlaying(sck,playHeader.Sensors[(int)SENSOR::OXYGEN],playHeader.Sensors[(int)SENSOR::TEMPERATURE],playHeader.Sensors[(int)SENSOR::PRESSURE]);
             cout<<"Playing to 127.0.0.1:8100:UDP"<<endl;
             lostconn = 0;
-            rtspheaders setupHeader;
-            int dataentry = 15;
-            oplaying = true;
+
+            int datacounter = 0;
             do
             {
-                // int rcvdmsglength;
-                // memset(buffer, 0, BUFFERSIZE);
-                // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                // string rcvdmsg(buffer);
-                // while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
-                // {
-                //     memset(buffer, 0, BUFFERSIZE);
-                //     rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                //     rcvdmsg += buffer;
-                // }
-                // rcvdmsglength = rcvdmsg.length();
                 //Send to UDP client
                 int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
                 struct sockaddr_in saddress;
                 saddress.sin_family = AF_INET; 
                 saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
                 saddress.sin_port = htons(8100); 
-                // char sndbuffer[BUFFERSIZE];
-                // cout<<oxygen[dataentry].to_ulong()<<"|"<<oxygen[dataentry].to_string()<<endl;
                 string sending = "79:" + oxygen[dataentry].to_string() + ";84:" + temperature[dataentry].to_string() + ";80:" + pressure[dataentry].to_string();// +"\r\n";
                 cout<<sending<<endl;
                 char sndbuffer[sending.length()];
                 strcpy(sndbuffer,sending.c_str());
                 sendto(udpsck, sndbuffer, sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
-                // if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
-                // {
-                //     dataentry = false;
-                // }
-                dataentry--;
-            }while(dataentry >= 0);
-            // cout<<"Oxygen Count: "<< oxygen.size()<<endl;
-            // cout<<"Pressure Count: "<< pressure.size()<<endl;
-            // cout<<"Temperature Count: "<< temperature.size()<<endl;
+                datacounter++;
+            }while(datacounter < 15);
+        }
+        else if(regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
+                regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
+        {
+            lostconn = 0;
+            bool dataentry = true;
+            do
+            {
+                int rcvdmsglength;
+                memset(buffer, 0, BUFFERSIZE);
+                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                string rcvdmsg(buffer);
+                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                {
+                    memset(buffer, 0, BUFFERSIZE);
+                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsg += buffer;
+                }
+                rcvdmsglength = rcvdmsg.length();
+                if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
+                {
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
+                    pauseHeader.CSeq = trim(rcvdmsg);
+                    sequence = stoi(pauseHeader.CSeq);
+                }
+                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                {
+                    dataentry = false;
+                }
+            }while(dataentry);
 
-            RTSPSendResponse(sck,200,setupHeader);
+            RTSPSendResponse(sck,200,pauseHeader);
+            sequence++;
+            sControl.SetPlaying(sck,false,false,false);
         }
         else if(rcvdmsglength == 0)
         {
@@ -525,6 +597,7 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
+    sControl.DisconnectClient(sck);
     close(sck);
     return 0;
 }
@@ -564,100 +637,121 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, rtspheaders _
 }
 void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName, int &_MaxReadings)
 {
+    const int BITS = 5;
+    const string ZEROBITS = "00000";
+    const string MAXBITS = "10000";
+    const int MAXBITSVALUE = 16;
+
     ifstream sensor(_FileName, ios::binary|ios::in);
     char c;
-    string bitstring = "00000";
-    int count = 4;
-    // int stop = 0;
+    int count = 0;
+    int bitcount = 0;
+    bitset<BITS> item(ZEROBITS);
     while(sensor.get(c))
     {
         unsigned char uc = static_cast<unsigned char>(c);
-        // cout<<c<<"|"<<uc<<endl;
-        for(int i = 0; i<8;i++)
+        for(int i = 0;i < 8;i++)
         {
-            int remainder = uc % 2;
-            // cout<<remainder;
-            bitstring[count] = to_string(remainder)[0];
-            count--;
-            if(count < 0)
+            int bit = uc % 2;
+            uc = (uc - bit)/2;
+            int setbit = ((count * 8) + i) % BITS;
+            item.set(setbit,bit);
+            bitcount++;
+            if(bitcount == BITS)
             {
-                std::bitset<5> newData (bitstring);
-                if(newData.to_ulong() <= OXYGENMAX)
+                if(item.to_ulong() > MAXBITSVALUE)
                 {
-                    _SensorData.push_back(newData);
-                    // cout<<endl<<newData.to_string()<<endl;
-                    _MaxReadings++;
+                    item = bitset<BITS>(MAXBITS);
                 }
-                else
-                {
-                    newData = bitset<5>("10000");
-                    _SensorData.push_back(newData);
-                    _MaxReadings++;
-                }
-                bitstring = "00000";
-                count = 4;
+                _SensorData.push_back(item);
+                item = bitset<BITS>(ZEROBITS);
+                bitcount = 0;
+                _MaxReadings++;
             }
-            uc = (uc - remainder) / 2;
-        }
-        // cout<<endl;
-        // stop++;
+        }       
+        count++;
     }
 }
 void cs447::ReadPressureSensor(vector<bitset<11>> &_SensorData, string _FileName, int &_MaxReadings)
 {
+    const int BITS = 11;
+    const string ZEROBITS = "00000000000";
+    const string MAXBITS = "10000011010";
+    const int MAXBITSVALUE = 1050;
+
     ifstream sensor(_FileName, ios::binary|ios::in);
     char c;
-    string bitstring = "00000000000";
-    int count = 10;
+    int count = 0;
+    int bitcount = 0;
+    bitset<BITS> item(ZEROBITS);
     while(sensor.get(c))
     {
         unsigned char uc = static_cast<unsigned char>(c);
-        for(int i = 0; i<8;i++)
+        for(int i = 0;i < 8;i++)
         {
-            int remainder = uc % 2;
-            bitstring[count] = to_string(remainder)[0];
-            count--;
-            if(count < 0)
+            int bit = uc % 2;
+            uc = (uc - bit)/2;
+            int setbit = ((count * 8) + i) % BITS;
+            item.set(setbit,bit);
+            bitcount++;
+            if(bitcount == BITS)
             {
-                bitset<11> newData (bitstring);
-                //if(newData.to_ulong() <= PRESSUREMAX)
+                if(item.to_ulong() > MAXBITSVALUE)
                 {
-                    _SensorData.push_back(newData);
+                    item = bitset<BITS>(MAXBITS);
                 }
-                bitstring = "00000000000";
-                count = 10;
+                _SensorData.push_back(item);
+                item = bitset<BITS>(ZEROBITS);
+                bitcount = 0;
+                _MaxReadings++;
             }
-            uc = (uc - remainder) / 2;
-        }
+        }       
+        count++;
     }
 }
 void cs447::ReadTemperatureSensor(vector<bitset<8>> &_SensorData, string _FileName, int &_MaxReadings)
 {
+    const int BITS = 8;
+    const string ZEROBITS = "00000000";
+    const string MAXBITS = "01111111";
+    const int MAXBITSVALUE = 127;
+
     ifstream sensor(_FileName, ios::binary|ios::in);
     char c;
-    string bitstring = "00000000";
-    int count = 7;
+    int count = 0;
+    int bitcount = 0;
+    bitset<BITS> item(ZEROBITS);
     while(sensor.get(c))
     {
         unsigned char uc = static_cast<unsigned char>(c);
-        for(int i = 0; i<8;i++)
+        for(int i = 0;i < 8;i++)
         {
-            int remainder = uc % 2;
-            bitstring[count] = to_string(remainder)[0];
-            count--;
-            if(count < 0)
+            int bit = uc % 2;
+            uc = (uc - bit)/2;
+            int setbit = ((count * 8) + i) % BITS;
+            //Ignoring left most bit per Dr. Gamage email
+            if(setbit == 7)
             {
-                bitset<8> newData (bitstring);
-                newData.set(7,0);//Ignore most significant bit per Dr. Gamage
-                //if(newData.to_ulong() <= TEMPERATUREMAX)
-                {
-                    _SensorData.push_back(newData);
-                }
-                bitstring = "00000000";
-                count = 7;
+                item.set(setbit,0);
             }
-            uc = (uc - remainder) / 2;
-        }
+            else
+            {
+                item.set(setbit,bit);
+            }
+            bitcount++;
+            if(bitcount == BITS)
+            {
+                if(item.to_ulong() > MAXBITSVALUE)
+                {
+                    item = bitset<BITS>(MAXBITS);
+                }
+                _SensorData.push_back(item);
+                item = bitset<BITS>(ZEROBITS);
+                bitcount = 0;
+                _MaxReadings++;
+            }
+        }       
+        count++;
     }
 }
 void cs447::RTSPPlay(tcpargs _SocketInfo)
@@ -680,12 +774,12 @@ void cs447::SensorIncrement(bool &_Playing, int &_Counter, int &_Size)
     std::chrono::seconds duration(3);
     while(true)
     {
-        if(_Playing && _Counter < _Size)
+        if(_Playing)
         {
             cout<<"Counter: "<<_Counter<<endl;
             _Counter++;
         }
-        else
+        if(_Counter >= _Size)
         {
             _Counter = 0;
         }
