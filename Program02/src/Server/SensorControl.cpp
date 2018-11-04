@@ -20,7 +20,7 @@ void SensorControl::AddClient(int _Socket)
 
 void SensorControl::DisconnectClient(int _Socket)
 {
-    for(int i = 0;i < clients.size(); i++)
+    for(unsigned int i = 0;i < clients.size(); i++)
     {
         if(clients[i].socket == _Socket)
         {
@@ -32,7 +32,7 @@ void SensorControl::DisconnectClient(int _Socket)
 void SensorControl::SetPlaying(int _Socket, bool _Oxygen, bool _Temperature, bool _Pressure)
 {
     //set individual socket state t/f
-    for(int i = 0;i < clients.size();i++)
+    for(unsigned int i = 0;i < clients.size();i++)
     {
         if(clients[i].socket == _Socket)
         {
@@ -45,7 +45,7 @@ void SensorControl::SetPlaying(int _Socket, bool _Oxygen, bool _Temperature, boo
     bool ocheck = false;
     bool tcheck = false;
     bool pcheck = false;
-    for(int i = 0;i < clients.size();i++)
+    for(unsigned int i = 0;i < clients.size();i++)
     {
         if(clients[i].oplaying)
         {

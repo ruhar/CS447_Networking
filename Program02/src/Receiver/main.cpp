@@ -16,9 +16,8 @@ int main(int argc, char const *argv[])
     }
     catch(const runtime_error &e)
     {
-        Goodbye();
         cout<<e.what()<<endl;
     }
-    
+        Goodbye();    
     return 0;
 }

@@ -49,9 +49,8 @@ string Transport::ToString()
     retval = rtrim(retval,';');
     return retval;
 }
-rtspheaders::rtspheaders()
+rtspheader::rtspheader()
 {
-    CSeq = "";
     Date = "";
     Sensor = "";
     TransportInfo = Transport();
@@ -65,33 +64,11 @@ rtspheaders::rtspheaders()
     Sensors.push_back(false);
 }
 
-rtspheaders::~rtspheaders()
+rtspheader::~rtspheader()
 {
 }
 
-string rtspheaders::PrintHeaders()
-{
-
-    string value = "";
-    if(CSeq != "")
-    {
-        value += "CSeq: " + CSeq + "\r\n";
-    }
-    if(Date != "")
-    {
-        value += "Date: " + Date + "\r\n";
-    }
-    if(TransportInfo.ToString() != "")
-    {
-        value += "Transport: " + TransportInfo.ToString() + "\r\n";
-    }
-    if(Sensor != "")
-    {
-        value += "Sensor: " + Sensor + "\r\n";
-    }
-    return value;
-}
-bool rtspheaders::SetSensor(string _Sensors)
+bool rtspheader::SetSensor(string _Sensors)
 {
     bool set = false;
     if(regex_match(_Sensors,regex("^(([otp*]){1},([otp]){1},([otp]){1})|^(([otp*]){1},([otp]){1})|^(([otp*]){1})(\\s){0,}",regex::icase)))
@@ -116,4 +93,35 @@ bool rtspheaders::SetSensor(string _Sensors)
     }
     return set;
 }
+
+RTSPHeaders::RTSPHeaders()
+{
+    CSeq = 0;
+    Headers[(int)HEADER::SETUP] = rtspheader();
+    Headers[(int)HEADER::PLAY] = rtspheader();
+    Headers[(int)HEADER::PAUSE] = rtspheader();
+    Headers[(int)HEADER::TEARDOWN] = rtspheader();
+    Headers[(int)HEADER::CONNECTION] = rtspheader();
+}
+string RTSPHeaders::PrintHeader(cs447::HEADER _header)
+{
+
+    string value = "CSeq: " + to_string(CSeq) + "\r\n";
+
+    if(Headers[(int)_header].Date != "")
+    {
+        value += "Date: " + Headers[(int)_header].Date + "\r\n";
+    }
+    if(Headers[(int)_header].TransportInfo.ToString() != "")
+    {
+        value += "Transport: " + Headers[(int)_header].TransportInfo.ToString() + "\r\n";
+    }
+    if(Headers[(int)_header].Sensor != "")
+    {
+        value += "Sensor: " + Headers[(int)_header].Sensor + "\r\n";
+    }
+    return value;
+}
+
+
 
