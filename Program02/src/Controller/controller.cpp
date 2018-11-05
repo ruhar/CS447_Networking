@@ -13,10 +13,11 @@
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include "common.hpp"
+#include <regex>
 
 using namespace std;
 using namespace cs447;
-
+int sequence = 0;
 const int BUFFERSIZE = 64;
 
 void cs447::Hello()
@@ -68,79 +69,99 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
     StringSplit(hostname,hostparts,'.');
     hostname = hostparts[0];
     string input = "";
-    while(input != "teardown\r\n")
+    string buffer = "";
+    while(input != "teardown")
     {
         input = "";
         getline(cin,input);
-        if(input == "setup")
+        buffer = input;
+        if(buffer == "setup")
         {
             cout<<"Setup"<<endl;
-
-            input = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            sequence = 0;
+            buffer = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
 
-            input = "cseq:0\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "cseq:" + to_string(sequence) + "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
 
-            input = "transport:UDP;unicast;dest_addr=\":" + to_string(_ReceiverPort) + "\"\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "transport:UDP;unicast;dest_addr=\":" + to_string(_ReceiverPort) + "\"\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
 
-            input = "sensor:*\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "sensor:*\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
 
-            input = "\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
         }
-        else if(input == "play")
+        else if(buffer == "play")
         {
             cout<<"Play"<<endl;
 
             // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
-            input = "play rtsp://" + hostname + " rtsp/2.0\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "play rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
             this_thread::sleep_for(chrono::milliseconds(100));
 
             // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
-            input = "sensor:*\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "sensor:*\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
             this_thread::sleep_for(chrono::milliseconds(100));
 
+            buffer = "cseq:" + to_string(sequence) + "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
             // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
-            input = "\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
             this_thread::sleep_for(chrono::milliseconds(100));
 
         }
-        else if(input == "pause")
+        else if(buffer == "pause")
         {
             cout<<"Pause"<<endl;
 
-            input = "pause rtsp://" + hostname + " rtsp/2.0\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "pause rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
 
-            input = "\r\n";
-            send(socket,input.c_str(),input.length(),0);
+            buffer = "cseq:" + to_string(sequence) + "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
+
+            buffer = "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+        }
+        else if(buffer == "teardown")
+        {
+            cout<<"Teardown"<<endl;
+            buffer = "teardown rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            buffer = "cseq:" + to_string(sequence) + "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            buffer = "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
         }
         else
         {
-            input += "\r\n";
-            // cout<<input.length()<<"|";
-            // for(int i = 0;i<input.length();i++)
-            // {
-            //     cout<<(int)input[i]<<"|";
-            // }
-            // cout<<endl;           
-            send(socket,input.c_str(),input.length(),0);
+            buffer += "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
         }
     }
 }
@@ -170,5 +191,19 @@ void cs447::RTSPReceiver(tcpargs _TCPArguments)
         }
         memset(buffer, 0, BUFFERSIZE);
         cout<<rcvdmsg;
+        vector<string> msgsplit;
+        StringSplit(rcvdmsg,msgsplit,'\n');
+        for(uint i = 0; i < msgsplit.size(); i++)
+        {
+            if(regex_match(msgsplit[i],regex("(cseq:){1}( ){0,}[0-9]{1,}(\\s){0,}",regex::icase)))
+            {
+                msgsplit[i] = regex_replace(msgsplit[i],regex("(cseq:)",regex::icase),"");
+                msgsplit[i] = regex_replace(msgsplit[i],regex("( )",regex::icase),"");
+                msgsplit[i] = regex_replace(msgsplit[i],regex("(\r)",regex::icase),"");
+                msgsplit[i] = regex_replace(msgsplit[i],regex("(\n)",regex::icase),"");
+                sequence = stoi(msgsplit[i]);
+                sequence++;
+            }
+        }
     }
 }

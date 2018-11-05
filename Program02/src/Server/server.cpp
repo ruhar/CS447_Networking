@@ -88,13 +88,9 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
     }
     cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
     struct sockaddr_in caddress;
-    // vector<pthread_t> server_thread;
     vector<std::thread> server_thread;
     while(true)
     {
-        // pthread_t newthread;
-        // server_thread.push_back(newthread);
-
         socklen_t caddr_length = sizeof(caddress);
         sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
 
@@ -107,278 +103,19 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
             tcpargs sckinfo;
             sckinfo.address = caddress;
             sckinfo.socket = sckaccept;
-            server_thread.push_back(thread(RTSPServerHandler,sckinfo));
+            //server_thread.push_back(thread(RTSPServerHandler,sckinfo));
+            thread(RTSPServerHandler,sckinfo).detach();
         }
     }   
 }
-void cs447::SMTPServer(int _Port)
-{
-
-    struct sockaddr_in saddress;
-    saddress.sin_family = AF_INET;
-    saddress.sin_port = htons(_Port);
-    saddress.sin_addr.s_addr = htonl(INADDR_ANY);  
-    
-    int sck = socket(PF_INET,SOCK_STREAM,0);
-    if(sck < 0)
-    {
-        throw runtime_error("Unable to start socket.");
-    }
-
-    int sckbind = bind(sck,(struct sockaddr *) &saddress,sizeof(saddress));
-    if(sckbind < 0)
-    {
-        throw runtime_error("Unable to bind to port " + to_string(_Port));
-    }
-
-    int scklisten = listen(sck,5);
-    if(scklisten < 0)
-    {
-        throw runtime_error("Unable to listien on port " + to_string(_Port));
-    }
-    cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
-    while(true)
-    {
-        pthread_t server_thread;
-        struct sockaddr_in caddress;
-        socklen_t caddr_length = sizeof(caddress);
-        sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
-        if(sckaccept < 0)
-        {
-            cout<<"Client connection refused from: "<<inet_ntoa(caddress.sin_addr)<<endl;
-        }
-        else
-        {
-            tcpargs sckinfo;
-            sckinfo.address = caddress;
-            sckinfo.socket = sckaccept;
-            pthread_create(&server_thread,NULL,&SMTPServerHandler,(void *) &sckinfo);
-        }
-    }
-}
-void *cs447::SMTPServerHandler(void *_sckinfo)
-{
-    bool listening = true;
-    bool helosent = false;
-    bool mailfrom = false;
-    bool rcptto = false;
-    string hostname = GetHostName();    
-    tcpargs *sckinfo = (tcpargs *)_sckinfo;
-    string msg = hostname + " Haddock's SMTP Service. Ready at " + GetCurrentTimeStamp();
-    char buffer[BUFFERSIZE];
-    memset(buffer, 0, BUFFERSIZE);
-    SMTPSendResponse(sckinfo->socket,220, msg);
-    cout<<"Opening SMTP Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
-    while(listening)
-    {
-        int rcvdmsglength;
-        rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-        string rcvdmsg(buffer);
-        while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
-        {
-            memset(buffer, 0, BUFFERSIZE);
-            rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-            rcvdmsg += buffer;
-        }
-        memset(buffer, 0, BUFFERSIZE);
-        if(regex_match(rcvdmsg,regex("^(quit)(\\s){0,}",regex::icase)))
-        {
-            SMTPSendResponse(sckinfo->socket,221,"Thank you for using Dr. C's Mail Services!");
-            listening = false;
-        }
-        else if(regex_match(rcvdmsg,regex("^(helo)(\\s){0,}",regex::icase)))
-        {
-            helosent = SMTPHelo(sckinfo->socket,sckinfo->address);
-        }
-        else if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(.){0,}(\\s){0,}",regex::icase)))
-        {
-            if(helosent)
-            {
-                if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(from:)(.){0,}(\\s){0,}",regex::icase)))
-                {
-                    if(regex_match(rcvdmsg,regex("^(mail)(\\s){1,}(from:)(\\s){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}(\\s){0,}",regex::icase)))
-                    {
-                        int firstcolon = rcvdmsg.find_first_of(':');
-                        string email = rcvdmsg.substr(firstcolon + 1);
-                        email = trim(email, 10);
-                        email = trim(email);
-                        email = ltrim(email,'<');
-                        email = rtrim(email,'>');
-                        SMTPSendResponse(sckinfo->socket,250,"Email from accepted.");
-                        mailfrom = true;
-                    }
-                    else
-                    {
-                        SMTPSendResponse(sckinfo->socket,501,"Invalid email address.");
-                    }
-                }
-                else
-                {
-                    SMTPSendResponse(sckinfo->socket,501,"Invalid Argument - must be \"mail from:\"");
-                }
-            }
-            else
-            {
-                SMTPSendResponse(sckinfo->socket,503,"Send HELO first");
-            }
-
-        }
-        else if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
-        {
-            if(mailfrom)
-            {
-                if(regex_match(rcvdmsg,regex("(rcpt)(\\s){1,}(to:)(\\s){0,}(.){0,}(\\s){0,}",regex::icase)))
-                {
-                    if(regex_match(rcvdmsg,regex("^(rcpt)(\\s){1,}(to:)(\\s){0,}(<){0,1}[\\w._%+-]+(@cs447f18.edu)(>){0,1}(\\s){0,}",regex::icase)))
-                    {
-                        int firstcolon = rcvdmsg.find_first_of(':');
-                        string email = rcvdmsg.substr(firstcolon + 1);
-                        email = trim(email, 10);
-                        email = trim(email);
-                        email = ltrim(email,'<');
-                        email = rtrim(email,'>');
-                        SMTPSendResponse(sckinfo->socket,250,"Email recipient accepted.");
-                        rcptto = true;
-                    }
-                    else
-                    {
-                        SMTPSendResponse(sckinfo->socket,501,"Invalid email address.");
-                    }
-                }
-                else
-                {
-                    SMTPSendResponse(sckinfo->socket,501,"Invalid Argument - must be \"rcpt to:\"");
-                }
-            }
-            else
-            {
-                SMTPSendResponse(sckinfo->socket,503,"Send MAIL FROM: first");
-            }
-        }
-        else if(regex_match(rcvdmsg,regex("^(data)(\\s){0,}",regex::icase)))
-        {
-            if(rcptto)
-            {
-                SMTPSendResponse(sckinfo->socket,354);
-                bool dataentry = true;
-                memset(buffer,0,BUFFERSIZE);
-                rcvdmsg = "";
-                while(dataentry)
-                {
-                    rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-                    if(regex_match(buffer,regex("^(\\.\\r\\n)$",regex::icase))||
-                    regex_match(buffer,regex("^(\\.\\n)$",regex::icase)))
-                    {
-                        dataentry = false;
-                    } 
-                    else
-                    {
-                        rcvdmsg += buffer;
-                    }
-                    while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
-                    {
-                        memset(buffer, 0, BUFFERSIZE);
-                        rcvdmsglength = recv(sckinfo->socket,buffer,BUFFERSIZE,0);
-                        rcvdmsg += buffer;
-                    }
-                    memset(buffer, 0, BUFFERSIZE);
-                }
-                SMTPSendResponse(sckinfo->socket,250,"Data entry complete");
-            }
-            else
-            {
-                SMTPSendResponse(sckinfo->socket,503,"Send RCPT TO: first");
-            }
-        }
-        else
-        {
-            SMTPSendResponse(sckinfo->socket,500);
-        }
-    }
-    cout<<"Closing SMTP Thread for client IP: "<<inet_ntoa(sckinfo->address.sin_addr)<<endl;
-    close(sckinfo->socket);
-    return 0;
-}
-int cs447::SMTPSendResponse(int &_ClientSocket, int _ResponseCode, string _Message)
-{
-    string msg = "";
-    switch (_ResponseCode)
-    {
-        case 220:
-            msg = "220 Hello: " + _Message + "\n";
-            break;
-        case 221:
-            msg = "221 Goodbye: " + _Message + "\n";
-            break;
-        case 250:
-            msg = "250 OK:" + _Message + "\n";
-            break;
-        case 354:
-            msg = "354 Start mail input, end with <CRLF>.<CRLF>\n";
-            break;
-        case 500:
-            msg = "500 Command syntax error: " +_Message + "\n";
-            break;
-        case 501:
-            msg = "501 Argument syntax error: " + _Message + "\n";
-            break;
-        case 502:
-            msg = "502 Command not implemented: " + _Message + "\n";
-            break;
-        case 503:
-            msg = "503 Bad sequence of commands: " +_Message + "\n";
-            break;  
-        case 554:
-            msg = "554 Transaction failed:";
-            break;
-        default:
-            msg += _ResponseCode + " " + _Message + "\n";
-            break;
-    }
-    if(msg.length() > 0)
-    {
-        // char msgSend[msg.length()];
-        // strcpy(msgSend,msg.c_str());
-        // return send(_ClientSocket,msgSend,sizeof(msgSend),0);
-        char msgSend[msg.length()];
-        strcpy(msgSend,msg.c_str());
-        int retval = 90210;
-        try
-        {
-            retval = send(_ClientSocket,msgSend,sizeof(msgSend),0);
-        }
-        catch(const std::exception& e)
-        {
-            cout << e.what() << '\n';
-        }        
-        return retval;
-    }
-    else
-    {
-        return -1;
-    }
-}
-bool cs447::SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress)
-{
-    string clientinfo(inet_ntoa(_ClientAddress.sin_addr));
-    int response = SMTPSendResponse(_ClientSocket,250,"Hello [" + clientinfo + "]");
-    if(response < 0)
-    {
-        return false;
-    }
-    else
-    {
-        return true;
-    }
-}
-
 void cs447::RTSPServerHandler(tcpargs _sckinfo)
 {
     bool listening = true;
     RTSPHeaders headers = RTSPHeaders();
     vector<std::thread> player;
 
-
+    string recvIPAddress = "";
+    int recvPort = 0;
     string hostname = GetHostName();    
     // int sck = ((tcpargs *)_sckinfo)->socket;
     // sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
@@ -423,25 +160,71 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         }
         memset(buffer, 0, BUFFERSIZE);
 
-        if(regex_match(rcvdmsg,regex("^(teardown)(\\s){0,}",regex::icase)))
+        bool cseqvalid = false;
+        // if(regex_match(rcvdmsg,regex("^(teardown)(\\s){0,}",regex::icase)))
+        if(regex_match(rcvdmsg,regex("teardown rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) || 
+           regex_match(rcvdmsg,regex("teardown rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){0,}")))
         {
             lostconn = 0;
-            RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN);
-            int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-            struct sockaddr_in saddress;
-            saddress.sin_family = AF_INET; 
-            saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-            saddress.sin_port = htons(8100); 
-            string sending = "teardown";
-            cout<<sending<<endl;
-            char sndbuffer[sending.length()];
-            strcpy(sndbuffer,sending.c_str());
-            sendto(udpsck, sndbuffer, sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
-            listening = false;
+            bool dataentry = true;
+            int teardowncseq;
+            cseqvalid = false;
+            do
+            {
+                int rcvdmsglength;
+                memset(buffer, 0, BUFFERSIZE);
+                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                string rcvdmsg(buffer);
+                while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
+                {
+                    memset(buffer, 0, BUFFERSIZE);
+                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsg += buffer;
+                }
+                rcvdmsglength = rcvdmsg.length();
+                if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
+                {
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
+                    //headers.CSeq = stoi(trim(rcvdmsg));
+                    if(stoi(trim(rcvdmsg)) == (headers.CSeq + 1))
+                    {
+                        cseqvalid = true;
+                        teardowncseq = stoi(trim(rcvdmsg));
+                    }
+                }
+                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                {
+                    dataentry = false;
+                }
+            }while(dataentry);
+            if(cseqvalid)
+            {
+                headers.CSeq = teardowncseq;
+                RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN);
+                int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+                struct sockaddr_in saddress;
+                saddress.sin_family = AF_INET; 
+                saddress.sin_addr.s_addr = inet_addr(recvIPAddress.c_str());
+                saddress.sin_port = htons(recvPort); 
+                string sending = "teardown";
+                cout<<sending<<endl;
+                sControl.SetPlaying(sck,false,false,false);
+                sendto(udpsck, sending.c_str(), sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
+                listening = false;
+            }
+            else
+            {
+                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+            }
+            lostconn = 0;
         }
         else if(regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
                 regex_match(rcvdmsg,regex("setup rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){0,}")))
         {
+            cseqvalid = false;
+            bool transportvalid = false;
             lostconn = 0;
             bool dataentry = true;
             do
@@ -463,6 +246,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
                     headers.CSeq = stoi(trim(rcvdmsg));
+                    cseqvalid = true;
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -486,27 +270,31 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort = transport[2];
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.SrcAddress = serverIP;
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.SrcPort = serverPort;
+                    transportvalid = true;
                 }
                 if((rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10))
                 {
                     dataentry = false;
                 }
             }while(dataentry);
-            RTSPSendResponse(sck,200,headers,HEADER::SETUP);
-            string IPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
-            int port = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
-            cout<<"1"<<endl;
-            cout<<"Port: "<< port << endl;
-            cout<<"IPAddress: "<< IPAddress << endl;
-            cout<<"Socket: " << sck << endl;
-
-            player.push_back(thread(RTSPPlay,sck,IPAddress,port));
-            cout<<"2"<<endl;
+            if(transportvalid && cseqvalid)
+            {
+                RTSPSendResponse(sck,200,headers,HEADER::SETUP);
+                recvIPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
+                recvPort = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
+                player.push_back(thread(RTSPPlay,sck,recvIPAddress,recvPort));
+            }
+            else
+            {
+                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+            }
         }
         else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
                 regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
         {
-            // cout<<"O:"<<maxoxygen<<"T:"<<maxtemperature<<"P:"<<maxpressure<<endl;
+            cseqvalid = false;
+            int playseq;
+            bool setsensor = false;
             lostconn = 0;
             bool dataentry = true;
             do
@@ -527,8 +315,16 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
-                    headers.CSeq = stoi(trim(rcvdmsg));
-                    // sequence = stoi(playHeader.CSeq);
+                    // headers.CSeq = stoi(trim(rcvdmsg));
+                    if(stoi(trim(rcvdmsg)) == (headers.CSeq + 1))
+                    {
+                        cseqvalid = true;
+                        playseq = stoi(trim(rcvdmsg));
+                    }
+                    else
+                    {
+                        RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                    }                
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -536,42 +332,38 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
                     headers.Headers[(int)HEADER::PLAY].SetSensor(trim(rcvdmsg));
+                    setsensor = true;
                 }
                 if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
                 {
                     dataentry = false;
                 }
             }while(dataentry);
-
-            RTSPSendResponse(sck,200,headers,HEADER::PLAY);
-            // sequence++;
-
-            sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
-            cout<<"Playing to 127.0.0.1:8100:UDP"<<endl;
-            lostconn = 0;
-
-            int datacounter = 0;
-            do
+            if(cseqvalid)
             {
-                //Send to UDP client
-                int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-                struct sockaddr_in saddress;
-                saddress.sin_family = AF_INET; 
-                saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-                saddress.sin_port = htons(8100); 
-                string sending = "79:" + oxygen[datacounter].to_string() + ";84:" + temperature[datacounter].to_string() + ";80:" + pressure[datacounter].to_string();// +"\r\n";
-                cout<<sending<<endl;
-                char sndbuffer[sending.length()];
-                strcpy(sndbuffer,sending.c_str());
-                sendto(udpsck, sndbuffer, sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
-                datacounter++;
-            }while(datacounter < 15);
+                if(!setsensor)
+                {
+                    headers.Headers[(int)HEADER::PLAY].SetSensor("*");
+                }
+                sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
+                RTSPSendResponse(sck,200,headers,HEADER::PLAY);
+                headers.CSeq = playseq;
+                // headers.CSeq++;
+            }
+            else
+            {
+                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+            }         
+            lostconn = 0;
         }
         else if(regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
                 regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
         {
+            cseqvalid = false;
+            int pauseseq;
             lostconn = 0;
             bool dataentry = true;
+            cout<<rcvdmsg<<endl;
             do
             {
                 int rcvdmsglength;
@@ -585,23 +377,38 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
+                cout<<rcvdmsg<<endl;
                 if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
                 {
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
-                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
-                    headers.CSeq = stoi(trim(rcvdmsg));
-                    // sequence = stoi(pauseHeader.CSeq);
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");  
+                    if(stoi(trim(rcvdmsg)) == (headers.CSeq + 1))
+                    {
+                        cseqvalid = true;
+                        pauseseq = stoi(trim(rcvdmsg));
+                    }
+                    else
+                    {
+                        RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                    }
                 }
                 if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
                 {
                     dataentry = false;
                 }
             }while(dataentry);
-
-            RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
-            // sequence++;
-            sControl.SetPlaying(sck,false,false,false);
+            if(cseqvalid)
+            {
+                RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
+                // headers.CSeq++;
+                headers.CSeq = pauseseq;
+                sControl.SetPlaying(sck,false,false,false);
+            }   
+            else
+            {
+                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+            }         
         }
         else if(rcvdmsglength == 0)
         {
@@ -609,11 +416,19 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         }
         else
         {
-            string sending = rcvdmsg;
-            // string sending = "79:" + oxygen[headers.CSeq].to_string() + ";84:" + temperature[headers.CSeq].to_string() + ";80:" + pressure[headers.CSeq].to_string();// +"\r\n";
+            // string sending = rcvdmsg;
+            string sending = "79:" + oxygen[curroxygen].to_string() + ";84:" + temperature[currtemperature].to_string() + ";80:" + pressure[currpressure].to_string();// +"\r\n";
             cout<<sending<<endl;
-            headers.CSeq++;
-            RTSPSendResponse(sck,200,headers,HEADER::CONNECTION);
+            //headers.CSeq++;
+            RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);
+            cout<<"Play States: "<<endl;
+            cout<<"O:"<<sControl.oplaying<<endl;
+            cout<<"T:"<<sControl.tplaying<<endl;
+            cout<<"P:"<<sControl.pplaying<<endl;
+            SensorControlClient *client = sControl.GetClient(sck);
+            cout<<"cO:"<<client->oplaying<<endl;
+            cout<<"cT:"<<client->tplaying<<endl;
+            cout<<"cP:"<<client->pplaying<<endl;
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
@@ -627,12 +442,20 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
 int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header)
 {
     string msg = "RTSP/2.0 ";
+    _Headers.Headers[(int)_Header].Date = GetCurrentTimeStamp();
     switch (_ResponseCode)
     {
         case 200:
-            msg += "200\r\n";
+            msg += "200 OK\r\n";
             msg += _Headers.PrintHeader(_Header);
             break;
+        case 400:
+            msg += "400 Bad Request\r\n";
+            msg += _Headers.PrintHeader(_Header);
+            break;
+        case 456:
+            msg += "456 Header Field Not Valid for Resource\r\n";
+            msg += _Headers.PrintHeader(_Header);
         default:
             msg += _ResponseCode + "\r\n";
             break;
@@ -813,13 +636,13 @@ void cs447::RTSPPlay(int _Socket, std::string _ReceiverIP, int _ReceiverPort)
         {
             msg += "80:00000000000"; 
         }
+        _Client = sControl.GetClient(_Socket);
         if(_Client->pplaying || _Client->tplaying || _Client->oplaying)
         {
             sendto(udpsck, msg.c_str(), msg.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
         }
         this_thread::sleep_for(chrono::seconds(3));
     }
-    cout<<"thread closing"<<endl;
 }
 void cs447::SensorIncrement(bool &_Playing, int &_Counter, int &_Size)
 {
@@ -828,7 +651,6 @@ void cs447::SensorIncrement(bool &_Playing, int &_Counter, int &_Size)
     {
         if(_Playing)
         {
-            cout<<"Counter: "<<_Counter<<endl;
             _Counter++;
         }
         if(_Counter >= _Size)
