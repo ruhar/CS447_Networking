@@ -429,7 +429,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
     sControl.DisconnectClient(sck);
-    for(int i = 0; i < player.size(); i++)
+    for(uint i = 0; i < player.size(); i++)
     {
         player[i].join();
     }

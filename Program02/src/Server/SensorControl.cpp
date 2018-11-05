@@ -68,7 +68,7 @@ void SensorControl::SetPlaying(int _Socket, bool _Oxygen, bool _Temperature, boo
 
 SensorControlClient *SensorControl::GetClient(int _Socket)
 {
-    for(int i = 0; i < clients.size();i++)
+    for(unsigned int i = 0; i < clients.size();i++)
     {
         if(clients[i].socket == _Socket)
         {

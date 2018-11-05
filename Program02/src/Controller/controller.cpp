@@ -34,7 +34,7 @@ void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _
     saddress.sin_family = AF_INET;
     saddress.sin_addr.s_addr = inet_addr(_ServerAddress.c_str());
     saddress.sin_port = htons(_ServerPort);
-    int yes = 1;
+    // int yes = 1;
     int sck = socket(PF_INET,SOCK_STREAM,IPPROTO_TCP);
     if(sck < 0)
     {
