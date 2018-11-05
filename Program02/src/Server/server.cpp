@@ -453,33 +453,18 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
         case 400:
             msg += "400 Bad Request\r\n";
             msg += _Headers.PrintHeader(_Header);
+            cout<<msg<<endl;
             break;
         case 456:
             msg += "456 Header Field Not Valid for Resource\r\n";
             msg += _Headers.PrintHeader(_Header);
+            cout<<msg<<endl;
             break;
         default:
             msg += _ResponseCode + "\r\n";
             break;
     }
-    if(msg.length() > 0)
-    {
-        int retval = -1;
-        try
-        {
-            retval = send(_ClientSocket,msg.c_str(),msg.size(),0);
-        }
-        catch(const std::exception& e)
-        {
-            cout << e.what() << '\n';
-        }
-        
-        return retval;
-    }
-    else
-    {
-        return -1;
-    }
+    return send(_ClientSocket,msg.c_str(),msg.size(),0);
 }
 void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName, int &_MaxReadings)
 {
