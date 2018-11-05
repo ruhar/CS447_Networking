@@ -45,6 +45,7 @@
         "mutex": "cpp",
         "ratio": "cpp",
         "thread": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "list": "cpp"
     }
 }

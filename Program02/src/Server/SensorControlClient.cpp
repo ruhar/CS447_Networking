@@ -9,4 +9,5 @@ SensorControlClient::SensorControlClient(int _Socket)
     oplaying = false;
     tplaying = false;
     pplaying = false;
+    killthread = false;
 }

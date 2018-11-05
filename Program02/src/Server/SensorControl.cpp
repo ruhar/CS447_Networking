@@ -25,6 +25,7 @@ void SensorControl::DisconnectClient(int _Socket)
         if(clients[i].socket == _Socket)
         {
             SensorControl::SetPlaying(_Socket,false,false,false);
+            clients[i].killthread = true;
         }
     }
 }
@@ -63,4 +64,16 @@ void SensorControl::SetPlaying(int _Socket, bool _Oxygen, bool _Temperature, boo
     oplaying = ocheck;
     tplaying = tcheck;
     pplaying = pcheck;
+}
+
+SensorControlClient *SensorControl::GetClient(int _Socket)
+{
+    for(int i = 0; i < clients.size();i++)
+    {
+        if(clients[i].socket == _Socket)
+        {
+            return &clients[i];
+        }
+    }
+    return NULL;
 }

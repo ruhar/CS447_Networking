@@ -9,7 +9,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <stdexcept>
 
 #include <unistd.h>
@@ -89,12 +88,12 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
     }
     cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
     struct sockaddr_in caddress;
-    vector<pthread_t> server_thread;
-
+    // vector<pthread_t> server_thread;
+    vector<std::thread> server_thread;
     while(true)
     {
-        pthread_t newthread;
-        server_thread.push_back(newthread);
+        // pthread_t newthread;
+        // server_thread.push_back(newthread);
 
         socklen_t caddr_length = sizeof(caddress);
         sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
@@ -108,7 +107,7 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
             tcpargs sckinfo;
             sckinfo.address = caddress;
             sckinfo.socket = sckaccept;
-            pthread_create(&server_thread.back(),NULL,RTSPServerHandler,(void *) &sckinfo);
+            server_thread.push_back(thread(RTSPServerHandler,sckinfo));
         }
     }   
 }
@@ -373,20 +372,18 @@ bool cs447::SMTPHelo(int &_ClientSocket, sockaddr_in _ClientAddress)
     }
 }
 
-void *cs447::RTSPServerHandler(void *_sckinfo)
+void cs447::RTSPServerHandler(tcpargs _sckinfo)
 {
     bool listening = true;
     RTSPHeaders headers = RTSPHeaders();
-    // rtspheader setupHeader;
-    // rtspheader playHeader;
-    // rtspheader pauseHeader;
-    // rtspheader connHeader;
-    //int sequence = 0;
+    vector<std::thread> player;
 
 
     string hostname = GetHostName();    
-    int sck = ((tcpargs *)_sckinfo)->socket;
-    sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
+    // int sck = ((tcpargs *)_sckinfo)->socket;
+    // sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
+    int sck = _sckinfo.socket;
+    sockaddr_in socketaddress = _sckinfo.address;
 
     struct sockaddr_in addr;
     socklen_t addr_size = sizeof(struct sockaddr_in);
@@ -447,7 +444,6 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
         {
             lostconn = 0;
             bool dataentry = true;
-            cout<<"1"<<endl;
             do
             {
                 int rcvdmsglength;
@@ -461,14 +457,12 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
-                cout<<"2"<<endl;
                 if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
                 {
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
                     headers.CSeq = stoi(trim(rcvdmsg));
-                    cout<<"3"<<endl;
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -476,9 +470,8 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
                     headers.Headers[(int)HEADER::SETUP].SetSensor(trim(rcvdmsg));
-                    cout<<"4"<<endl;
                 }
-                if(regex_match(rcvdmsg,regex("(transport:){1}( ){0,}(UDP;){1}(unicast;){1}(destaddr=\":){1}[0-9]{1,5}(\"){1}(\\s){0,}",regex::icase)))
+                if(regex_match(rcvdmsg,regex("(transport:){1}( ){0,}(UDP;){1}(unicast;){1}(dest_addr=\":){1}[0-9]{1,5}(\"){1}(\\s){0,}",regex::icase)))
                 {
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(transport:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
@@ -487,27 +480,28 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
                     StringSplit(rcvdmsg,transport,';');
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.Protocol = transport[0];
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.Transmission = transport[1]; 
-                    transport[1] = regex_replace(transport[1],regex("(destaddr=\":)",regex::icase),"");
-                    transport[1] = regex_replace(transport[1],regex("(\")",regex::icase),"");
-                    headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort = transport[1];
+                    transport[2] = regex_replace(transport[2],regex("(dest_addr=\":)",regex::icase),"");
+                    transport[2] = regex_replace(transport[2],regex("(\")",regex::icase),"");
+                    headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress = inet_ntoa(socketaddress.sin_addr);
+                    headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort = transport[2];
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.SrcAddress = serverIP;
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.SrcPort = serverPort;
-                    cout<<"5"<<endl;
                 }
                 if((rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10))
                 {
-                    cout<<"6"<<endl;
                     dataentry = false;
                 }
-                for(int i = 0; i < rcvdmsglength; i++)
-                {
-                    cout<<(int)rcvdmsg[i]<<" ";
-                }
-                cout<<endl;
             }while(dataentry);
-            // setupHeader.TransportInfo.SrcAddress
             RTSPSendResponse(sck,200,headers,HEADER::SETUP);
-            // sequence++;
+            string IPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
+            int port = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
+            cout<<"1"<<endl;
+            cout<<"Port: "<< port << endl;
+            cout<<"IPAddress: "<< IPAddress << endl;
+            cout<<"Socket: " << sck << endl;
+
+            player.push_back(thread(RTSPPlay,sck,IPAddress,port));
+            cout<<"2"<<endl;
         }
         else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
                 regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
@@ -624,8 +618,11 @@ void *cs447::RTSPServerHandler(void *_sckinfo)
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
     sControl.DisconnectClient(sck);
+    for(int i = 0; i < player.size(); i++)
+    {
+        player[i].join();
+    }
     close(sck);
-    return 0;
 }
 int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header)
 {
@@ -780,20 +777,49 @@ void cs447::ReadTemperatureSensor(vector<bitset<8>> &_SensorData, string _FileNa
         count++;
     }
 }
-void cs447::RTSPPlay(tcpargs _SocketInfo)
+void cs447::RTSPPlay(int _Socket, std::string _ReceiverIP, int _ReceiverPort)
 {
-    // int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    // struct sockaddr_in saddress = _SocketInfo.address;
-    // saddress.sin_family = AF_INET; 
-    // saddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-    // saddress.sin_port = htons(8100); 
-    // char sndbuffer[BUFFERSIZE];
-    // cout<<oxygen[dataentry].to_ulong()<<"|"<<oxygen[dataentry].to_string()<<endl;
-    // string sending = "79:" + oxygen[dataentry].to_string() + ";84:" + temperature[dataentry].to_string() + ";80:" + pressure[dataentry].to_string();// +"\r\n";
-    // cout<<sending<<endl;
-    // char sndbuffer[sending.length()];
-    // strcpy(sndbuffer,sending.c_str());
-    // sendto(udpsck, sndbuffer, sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
+    int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    struct sockaddr_in saddress;
+    saddress.sin_family = AF_INET; 
+    saddress.sin_addr.s_addr = inet_addr(_ReceiverIP.c_str());
+    saddress.sin_port = htons(_ReceiverPort); 
+    string msg = "";
+    SensorControlClient *_Client = sControl.GetClient(_Socket);
+    while(!_Client->killthread)
+    {
+        msg = "";
+        if(_Client->oplaying)
+        {
+            msg += "79:" + oxygen[curroxygen].to_string() + ";";
+        }
+        else
+        {
+            msg += "79:00000;";
+        }
+        if(_Client->tplaying)
+        {
+            msg += "84:" + temperature[currtemperature].to_string() + ";";
+        }
+        else
+        {
+            msg += "84:00000000;";
+        }
+        if(_Client->pplaying)
+        {
+            msg += "80:" + pressure[currpressure].to_string();
+        }
+        else
+        {
+            msg += "80:00000000000"; 
+        }
+        if(_Client->pplaying || _Client->tplaying || _Client->oplaying)
+        {
+            sendto(udpsck, msg.c_str(), msg.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
+        }
+        this_thread::sleep_for(chrono::seconds(3));
+    }
+    cout<<"thread closing"<<endl;
 }
 void cs447::SensorIncrement(bool &_Playing, int &_Counter, int &_Size)
 {

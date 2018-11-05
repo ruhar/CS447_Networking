@@ -10,6 +10,7 @@ namespace cs447
             bool oplaying;
             bool tplaying;
             bool pplaying;
+            bool killthread;
             SensorControlClient(int _Socket);
     };
 }

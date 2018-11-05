@@ -12,7 +12,7 @@ int main(int argc, char const *argv[])
     try
     {
         Hello();
-        RTSPControlClient(argv[1], stoi(argv[2]));
+        RTSPControlClient(argv[1], stoi(argv[2]), stoi(argv[3]));
     }
     catch(const runtime_error &e)
     {

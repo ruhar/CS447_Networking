@@ -39,7 +39,7 @@ string Transport::ToString()
     }
     if(SrcAddress != ""||SrcPort != "")
     {
-        retval += "dest_addr=\"" + SrcAddress;
+        retval += "src_addr=\"" + SrcAddress;
         if(SrcPort != "")
         {
             retval += ":" + SrcPort;

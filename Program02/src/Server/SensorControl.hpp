@@ -18,6 +18,7 @@ namespace cs447
         void AddClient(int _Socket);
         void DisconnectClient(int _Socket);
         void SetPlaying(int _Socket, bool _Oxygen, bool _Temperature, bool _Pressure);
+        SensorControlClient* GetClient(int _Socket);
     };
 }
 

@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include "common.hpp"
 
 using namespace std;
 using namespace cs447;
@@ -26,13 +27,13 @@ void cs447::Goodbye()
 {
     cout<<"Thank you for using Dr. Calculus's mail services!\n";    
 }
-void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort)
+void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _ReceiverPort)
 {
     struct sockaddr_in saddress;
     saddress.sin_family = AF_INET;
     saddress.sin_addr.s_addr = inet_addr(_ServerAddress.c_str());
     saddress.sin_port = htons(_ServerPort);
-
+    int yes = 1;
     int sck = socket(PF_INET,SOCK_STREAM,IPPROTO_TCP);
     if(sck < 0)
     {
@@ -43,12 +44,11 @@ void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort)
     {
         throw runtime_error("Unable to connect to server: " + _ServerAddress + " Port: " + to_string(_ServerPort));
     }
-    // int yes = 1;
-    // int result = setsockopt(sck, IPPROTO_TCP, TCP_NODELAY, (char *) &yes, sizeof(int)); 
+    setsockopt(sck, SOL_TCP, TCP_NODELAY, &yes, sizeof(yes));
     tcpargs serverinfo;
     serverinfo.socket = sck;
     serverinfo.address = saddress;
-    thread sendthread (RTSPSender,serverinfo);
+    thread sendthread (RTSPSender,serverinfo,_ReceiverPort);
     thread rcvthread (RTSPReceiver,serverinfo);
 
     sendthread.join();
@@ -56,60 +56,90 @@ void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort)
     rcvthread.~thread();
     close(sck);
 }
-void cs447::RTSPSender(tcpargs _TCPArguments)
+void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
 {
     int socket = _TCPArguments.socket;
-    int yes = 1;
-    int no = 0;
-    // int result = setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *) &yes, sizeof(int)); 
-
-    // struct sockaddr_in saddress = _TCPArguments.address;
+    // int yes = 1;
+    // int no = 0;
     char node[NI_MAXHOST];
     getnameinfo((struct sockaddr*)&_TCPArguments.address, sizeof(_TCPArguments.address), node, sizeof(node),NULL, 0, NI_NAMEREQD);
     string hostname(node);
-    // cout<<"Hostname:"<<hostname<<endl;
-
+    vector<string> hostparts;
+    StringSplit(hostname,hostparts,'.');
+    hostname = hostparts[0];
     string input = "";
     while(input != "teardown\r\n")
     {
-        // int length;
         input = "";
         getline(cin,input);
         if(input == "setup")
         {
             cout<<"Setup"<<endl;
-            input = "setup rtsp://localhost rtsp/2.0\r\n";
-            cout<<input.length()<<"|"<<input;
+
+            input = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,input.c_str(),input.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
-            input = "cseq:10\r\n";
-            cout<<input.length()<<"|"<<input;
+
+            input = "cseq:0\r\n";
             send(socket,input.c_str(),input.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
-            // input = "transport:UDP;unicast;dest_addr=\":" + to_string(ntohs(_TCPArguments.address.sin_port)) + "\"\r\n";
-            // cout<<input.length()<<"|"<<input;
-            // send(socket,input.c_str(),input.length(),0);
+
+            input = "transport:UDP;unicast;dest_addr=\":" + to_string(_ReceiverPort) + "\"\r\n";
+            send(socket,input.c_str(),input.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
 
             input = "sensor:*\r\n";
-            cout<<input.length()<<"|"<<input;
             send(socket,input.c_str(),input.length(),0);
-            setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
             this_thread::sleep_for(chrono::milliseconds(100));
 
-            setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(yes));
             input = "\r\n";
-            cout<<input.length()<<"|"<<input;
             send(socket,input.c_str(),input.length(),0);
-            setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
+            this_thread::sleep_for(chrono::milliseconds(100));
+        }
+        else if(input == "play")
+        {
+            cout<<"Play"<<endl;
+
+            // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
+            input = "play rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,input.c_str(),input.length(),0);
+            // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
+            input = "sensor:*\r\n";
+            send(socket,input.c_str(),input.length(),0);
+            // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
+            input = "\r\n";
+            send(socket,input.c_str(),input.length(),0);
+            // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+        }
+        else if(input == "pause")
+        {
+            cout<<"Pause"<<endl;
+
+            input = "pause rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,input.c_str(),input.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            input = "\r\n";
+            send(socket,input.c_str(),input.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
         }
         else
         {
             input += "\r\n";
-            // length = input.length();
-            // char buffer[length + 1];
-            // strcpy(buffer,input.c_str());
-            cout<<input.length()<<"|"<<input;           
+            // cout<<input.length()<<"|";
+            // for(int i = 0;i<input.length();i++)
+            // {
+            //     cout<<(int)input[i]<<"|";
+            // }
+            // cout<<endl;           
             send(socket,input.c_str(),input.length(),0);
         }
     }
