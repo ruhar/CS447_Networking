@@ -289,8 +289,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
             }
         }
-        else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
-                regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
+        else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
+                regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){0,}")))
         {
             cseqvalid = false;
             int playseq;
@@ -345,9 +345,9 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 {
                     headers.Headers[(int)HEADER::PLAY].SetSensor("*");
                 }
+                headers.CSeq = playseq;
                 sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
                 RTSPSendResponse(sck,200,headers,HEADER::PLAY);
-                headers.CSeq = playseq;
             }
             else
             {
@@ -355,13 +355,14 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }         
             lostconn = 0;
         }
-        else if(regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){1,}",regex::icase)) ||
-                regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){1,}")))
+        else if(regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
+                regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){0,}")))
         {
             cseqvalid = false;
             int pauseseq;
             lostconn = 0;
             bool dataentry = true;
+            // cout<<"Server CSeq: "<< to_string(headers.CSeq)<<endl;
             // cout<<rcvdmsg<<endl;
             do
             {
@@ -399,8 +400,9 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }while(dataentry);
             if(cseqvalid)
             {
-                RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
+                // cout<<"cseq valid"<<endl;
                 headers.CSeq = pauseseq;
+                RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
                 sControl.SetPlaying(sck,false,false,false);
             }   
             else
@@ -452,18 +454,17 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
         case 456:
             msg += "456 Header Field Not Valid for Resource\r\n";
             msg += _Headers.PrintHeader(_Header);
+            break;
         default:
             msg += _ResponseCode + "\r\n";
             break;
     }
     if(msg.length() > 0)
     {
-        char msgSend[msg.length()];
-        strcpy(msgSend,msg.c_str());
-        int retval = 90210;
+        int retval = -1;
         try
         {
-            retval = send(_ClientSocket,msgSend,sizeof(msgSend),0);
+            retval = send(_ClientSocket,msg.c_str(),msg.size(),0);
         }
         catch(const std::exception& e)
         {
