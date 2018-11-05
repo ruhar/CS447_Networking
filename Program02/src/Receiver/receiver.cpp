@@ -19,11 +19,11 @@ using namespace cs447;
 const int BUFFERSIZE = 64;
 void cs447::Hello()
 {
-    cout<<"Welcome to the electronic age Captain!\n";
+    cout<<"Hello Captain, waiting for data from the probe!\n";
 }
 void cs447::Goodbye()
 {
-    cout<<"Thank you for using Dr. Calculus's sensor data collection service!\n";    
+    cout<<"Thank you for using the sensor data receiving service!\n";    
 }
 void cs447::RTSPReceiverClient(int _ServerPort)
 {
@@ -46,7 +46,6 @@ void cs447::RTSPReceiverClient(int _ServerPort)
     memset(buffer,0,BUFFERSIZE);
     struct sockaddr_in caddress;
     socklen_t clength = sizeof(caddress);
-    // cout<<"12345678901234567890 12345678901234567890 12345678901234567890"<<endl;
     cout<<"Oxygen               Temperature          Pressure"<<endl;
     cout<<"--------------------|--------------------|--------------------"<<endl;
     while(listen)

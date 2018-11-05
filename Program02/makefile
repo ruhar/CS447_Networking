@@ -1,7 +1,11 @@
-#makefile for server.cpp in P02
-# all: server client
 INC = -I ./src/Common -I ./src/Server -I ./src/ControlClient -I ./src/Receiver
-all: server controller receiver
+all: dirs server controller receiver
+
+dirs:
+	mkdir -p ./bin
+	mkdir -p ./bin/server
+	mkdir -p ./bin/controller
+	mkdir -p ./bin/receiver
 
 server: sensorcontrolclient.o sensorcontrol.o rtspheaders.o tcpargs.o common.o server.o servermain.o 
 	g++ -g -pthread ./bin/server/sensorcontrolclient.o ./bin/server/sensorcontrol.o ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server/server.o ./bin/server/main.o -o ./server.app
@@ -46,26 +50,5 @@ sensorcontrolclient.o: src/Server/SensorControlClient.cpp src/Server/SensorContr
 	g++ -c -Wall -g $(INC) src/Server/SensorControlClient.cpp -o ./bin/server/sensorcontrolclient.o
 
 clean:
-	rm ./bin/*.* ./bin/controller/*.* ./bin/server/*.* ./bin/receiver/*.* ./server.app ./receiver.app ./controller.app
-
-# g++ -o ./bin/main.app $(INC) ./src/Common/common.cpp ./src/Server/server.cpp ./src/Server/main.cpp
-# server: main.app
-# 	g++ -pthread -Wall -g -o /server/main.app ./server/main.o ./server/server.o ./common/common.o
-	
-# /server/main.o: /server/main.cpp
-# 	g++ -Wall -g -c /server/main.cpp
-
-# /server/server.o: /server/server.cpp
-# 	g++ -Wall -g -c /server/server.cpp
-
-# # client: clientmain.o client.o
-# # 	g++ -Wall -g -o ./client/main.app ./client/clientmain.o ./client/client.o
-	
-# # clientmain.o: main.cpp
-# # 	g++ -Wall -g -c ./client/main.cpp
-
-# # client.o: client.cpp
-# # 	g++ -Wall -g -c ./client/client.cpp
-
-# ./common/common.o: ./common/common.cpp
-# 	g++ -Wall -g -c ./common/common.cpp
+	rm ./server.app ./receiver.app ./controller.app
+	rm -r ./bin/

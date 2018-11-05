@@ -48,11 +48,11 @@ SensorControl sControl;
 
 void cs447::Hello()
 {
-    cout<<"Welcome to the electronic age Captain!\n";
+    cout<<"Captain Haddock's streaming sensor probe!\n";
 }
 void cs447::Goodbye()
 {
-    cout<<"Thank you for using Dr. Calculus's mail services!\n";    
+    cout<<"Thank you for using sensor probing services!\n";    
 }
 
 void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, string _PressureFile)
@@ -103,7 +103,6 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
             tcpargs sckinfo;
             sckinfo.address = caddress;
             sckinfo.socket = sckaccept;
-            //server_thread.push_back(thread(RTSPServerHandler,sckinfo));
             thread(RTSPServerHandler,sckinfo).detach();
         }
     }   
@@ -117,8 +116,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     string recvIPAddress = "";
     int recvPort = 0;
     string hostname = GetHostName();    
-    // int sck = ((tcpargs *)_sckinfo)->socket;
-    // sockaddr_in socketaddress = ((tcpargs *)_sckinfo)->address;
     int sck = _sckinfo.socket;
     sockaddr_in socketaddress = _sckinfo.address;
 
@@ -129,7 +126,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     string serverPort = to_string(ntohs(addr.sin_port));
 
     sControl.AddClient(sck);
-    // string msg = hostname + " Haddock's RTSP Service. Ready at " + GetCurrentTimeStamp();
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
     headers.CSeq = 0;
@@ -161,7 +157,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         memset(buffer, 0, BUFFERSIZE);
 
         bool cseqvalid = false;
-        // if(regex_match(rcvdmsg,regex("^(teardown)(\\s){0,}",regex::icase)))
         if(regex_match(rcvdmsg,regex("teardown rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) || 
            regex_match(rcvdmsg,regex("teardown rtsp:\\/\\/([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})\\.([0-2]{0,1}[0-9]{0,2})(\\/){0,1} rtsp\\/2.0(\\s){0,}")))
         {
@@ -187,7 +182,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
-                    //headers.CSeq = stoi(trim(rcvdmsg));
                     if(stoi(trim(rcvdmsg)) == (headers.CSeq + 1))
                     {
                         cseqvalid = true;
@@ -286,7 +280,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }
             else
             {
-                // RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
                 RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
             }
         }
@@ -316,16 +309,11 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
-                    // headers.CSeq = stoi(trim(rcvdmsg));
                     if(stoi(trim(rcvdmsg)) == (headers.CSeq + 1))
                     {
                         cseqvalid = true;
                         playseq = stoi(trim(rcvdmsg));
                     }
-                    // else
-                    // {
-                    //     RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
-                    // }                
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -352,7 +340,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }
             else
             {
-                // RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
                 RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
             }         
             lostconn = 0;
@@ -364,8 +351,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             int pauseseq;
             lostconn = 0;
             bool dataentry = true;
-            // cout<<"Server CSeq: "<< to_string(headers.CSeq)<<endl;
-            // cout<<rcvdmsg<<endl;
             do
             {
                 int rcvdmsglength;
@@ -379,7 +364,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
-                // cout<<rcvdmsg<<endl;
                 if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
                 {
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
@@ -390,10 +374,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         cseqvalid = true;
                         pauseseq = stoi(trim(rcvdmsg));
                     }
-                    // else
-                    // {
-                    //     RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
-                    // }
                 }
                 if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
                 {
@@ -402,14 +382,12 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }while(dataentry);
             if(cseqvalid)
             {
-                // cout<<"cseq valid"<<endl;
                 headers.CSeq = pauseseq;
                 RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
                 sControl.SetPlaying(sck,false,false,false);
             }   
             else
             {
-                // RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
                 RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
             }         
         }
@@ -419,17 +397,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         }
         else
         {
-            // string sending = "79:" + oxygen[curroxygen].to_string() + ";84:" + temperature[currtemperature].to_string() + ";80:" + pressure[currpressure].to_string();// +"\r\n";
-            // cout<<sending<<endl;
             RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);
-            // cout<<"Play States: "<<endl;
-            // cout<<"O:"<<sControl.oplaying<<endl;
-            // cout<<"T:"<<sControl.tplaying<<endl;
-            // cout<<"P:"<<sControl.pplaying<<endl;
-            // SensorControlClient *client = sControl.GetClient(sck);
-            // cout<<"cO:"<<client->oplaying<<endl;
-            // cout<<"cT:"<<client->tplaying<<endl;
-            // cout<<"cP:"<<client->pplaying<<endl;
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
