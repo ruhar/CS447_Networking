@@ -286,7 +286,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }
             else
             {
-                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                // RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
             }
         }
         else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
@@ -321,10 +322,10 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         cseqvalid = true;
                         playseq = stoi(trim(rcvdmsg));
                     }
-                    else
-                    {
-                        RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
-                    }                
+                    // else
+                    // {
+                    //     RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                    // }                
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -351,7 +352,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }
             else
             {
-                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                // RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
             }         
             lostconn = 0;
         }
@@ -388,10 +390,10 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         cseqvalid = true;
                         pauseseq = stoi(trim(rcvdmsg));
                     }
-                    else
-                    {
-                        RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
-                    }
+                    // else
+                    // {
+                    //     RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                    // }
                 }
                 if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
                 {
@@ -407,7 +409,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }   
             else
             {
-                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                // RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
             }         
         }
         else if(rcvdmsglength == 0)
