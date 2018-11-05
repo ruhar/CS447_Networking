@@ -348,7 +348,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
                 RTSPSendResponse(sck,200,headers,HEADER::PLAY);
                 headers.CSeq = playseq;
-                // headers.CSeq++;
             }
             else
             {
@@ -363,7 +362,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             int pauseseq;
             lostconn = 0;
             bool dataentry = true;
-            cout<<rcvdmsg<<endl;
+            // cout<<rcvdmsg<<endl;
             do
             {
                 int rcvdmsglength;
@@ -377,7 +376,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
-                cout<<rcvdmsg<<endl;
+                // cout<<rcvdmsg<<endl;
                 if(regex_match(rcvdmsg,regex("^(cseq:){1}( ){0,}[0-9]{1,5}(\\s){0,}",regex::icase)))
                 {
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
@@ -401,7 +400,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             if(cseqvalid)
             {
                 RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
-                // headers.CSeq++;
                 headers.CSeq = pauseseq;
                 sControl.SetPlaying(sck,false,false,false);
             }   
@@ -416,19 +414,17 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         }
         else
         {
-            // string sending = rcvdmsg;
-            string sending = "79:" + oxygen[curroxygen].to_string() + ";84:" + temperature[currtemperature].to_string() + ";80:" + pressure[currpressure].to_string();// +"\r\n";
-            cout<<sending<<endl;
-            //headers.CSeq++;
+            // string sending = "79:" + oxygen[curroxygen].to_string() + ";84:" + temperature[currtemperature].to_string() + ";80:" + pressure[currpressure].to_string();// +"\r\n";
+            // cout<<sending<<endl;
             RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);
-            cout<<"Play States: "<<endl;
-            cout<<"O:"<<sControl.oplaying<<endl;
-            cout<<"T:"<<sControl.tplaying<<endl;
-            cout<<"P:"<<sControl.pplaying<<endl;
-            SensorControlClient *client = sControl.GetClient(sck);
-            cout<<"cO:"<<client->oplaying<<endl;
-            cout<<"cT:"<<client->tplaying<<endl;
-            cout<<"cP:"<<client->pplaying<<endl;
+            // cout<<"Play States: "<<endl;
+            // cout<<"O:"<<sControl.oplaying<<endl;
+            // cout<<"T:"<<sControl.tplaying<<endl;
+            // cout<<"P:"<<sControl.pplaying<<endl;
+            // SensorControlClient *client = sControl.GetClient(sck);
+            // cout<<"cO:"<<client->oplaying<<endl;
+            // cout<<"cT:"<<client->tplaying<<endl;
+            // cout<<"cP:"<<client->pplaying<<endl;
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
