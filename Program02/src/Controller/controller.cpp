@@ -45,7 +45,7 @@ void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _
     {
         throw runtime_error("Unable to connect to server: " + _ServerAddress + " Port: " + to_string(_ServerPort));
     }
-    setsockopt(sck, SOL_TCP, TCP_NODELAY, &yes, sizeof(yes));
+    //setsockopt(sck, SOL_TCP, TCP_NODELAY, &yes, sizeof(yes));
     tcpargs serverinfo;
     serverinfo.socket = sck;
     serverinfo.address = saddress;
@@ -60,8 +60,6 @@ void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _
 void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
 {
     int socket = _TCPArguments.socket;
-    // int yes = 1;
-    // int no = 0;
     char node[NI_MAXHOST];
     getnameinfo((struct sockaddr*)&_TCPArguments.address, sizeof(_TCPArguments.address), node, sizeof(node),NULL, 0, NI_NAMEREQD);
     string hostname(node);
@@ -81,23 +79,23 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             sequence = 0;
             buffer = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "cseq:" + to_string(sequence) + "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "transport:UDP;unicast;dest_addr=\":" + to_string(_ReceiverPort) + "\"\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "sensor:*\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
         }
         else if(buffer == "play")
         {
@@ -107,23 +105,23 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             buffer = "play rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
             buffer = "sensor:*\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "cseq:" + to_string(sequence) + "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             // setsockopt(socket,SOL_TCP, TCP_CORK, &yes, sizeof(no));
             buffer = "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             // setsockopt(socket,SOL_TCP, TCP_CORK, &no, sizeof(no));
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
         }
         else if(buffer == "pause")
@@ -132,30 +130,30 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
 
             buffer = "pause rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "cseq:" + to_string(sequence) + "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
         }
         else if(buffer == "teardown")
         {
             cout<<"Teardown"<<endl;
             buffer = "teardown rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "cseq:" + to_string(sequence) + "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
             buffer = "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(200));
 
         }
         else
