@@ -84,7 +84,6 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
 {
     int socket = _TCPArguments.socket;
     char node[NI_MAXHOST];
-    locale loc;
     getnameinfo((struct sockaddr*)&_TCPArguments.address, sizeof(_TCPArguments.address), node, sizeof(node),NULL, 0, NI_NAMEREQD);
     string hostname(node);
     vector<string> hostparts;
@@ -92,16 +91,13 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
     hostname = hostparts[0];
     string input = "";
     string buffer = "";
-    while(buffer != "teardown")
+    bool running = true;
+    while(running)
     {
         input = "";
         getline(cin,input);
-        buffer = "";
-        for(int i = 0; i < input.length();i++)
-        {
-            buffer += tolower(input[i],loc);
-        }
-        if(buffer == "setup")
+        buffer = input;
+        if(regex_match(buffer,regex("( ){0,}setup( ){0,}(\\s){0,}",regex::icase)))
         {
             sequence = 0;
             buffer = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
@@ -124,7 +120,7 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
         }
-        else if(buffer == "play")
+        else if(regex_match(buffer,regex("( ){0,}play( ){0,}(\\s){0,}",regex::icase)))
         {
             buffer = "play rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
@@ -143,7 +139,7 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             this_thread::sleep_for(chrono::milliseconds(100));
 
         }
-        else if(buffer == "pause")
+        else if(regex_match(buffer,regex("( ){0,}pause( ){0,}(\\s){0,}",regex::icase)))
         {
             buffer = "pause rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
@@ -157,7 +153,7 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
         }
-        else if(buffer == "teardown")
+        else if(regex_match(buffer,regex("( ){0,}teardown( ){0,}(\\s){0,}",regex::icase)))
         {
             buffer = "teardown rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
@@ -170,6 +166,11 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             buffer = "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
+            running = false;
+        }
+        else if(regex_match(buffer,regex("( ){0,}help( ){0,}(\\s){0,}",regex::icase)))
+        {
+            Help();
         }
         else
         {
