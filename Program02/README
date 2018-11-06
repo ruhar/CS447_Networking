@@ -23,6 +23,9 @@ November 5, 2018
 Summary:
 Program 02 implements a make shift version of the rtsp out of band protocol to aid Captain Haddock monitor oxygen, temperature, and pressure in his quest to find the last unicorn. There are 3 executables, server.app, controller.app, and receiver.app. The server and receiver should be running before the controller. The controller is capable of accepting multiple clients that act independently of one another to receive the same sensor data.
 
+Extra Credit:
+Multiple controller/receiver client pairs can connect to the server concurrently. In addition, if one client is playing temperature, it will not display on paused clients. Seperate clients are able to request pause, but the server will only pause if no other connected clients are playing that sensor. When a client pauses, but another continues, when paused client plays again, it will start playing data from the other clients position. If all clients are paused, data will not be processed until a client performs a play.
+
 Installation:
 From the directory with "makefile"
 To install
@@ -46,6 +49,16 @@ Example
 ./server.app 8100 ./oxygen.bin ./temperature.bin ./pressure.bin
 ./receiver.app 4800
 ./controller.app home.cs.siue.edu 8100 4800
+
+Usage:
+All commands are issued from the controller application.
+The following quick commands are recommended, however all command can be fully typed.
+setup     #must be ran first before any data can be sent to receiver
+play      #
+pause
+teardown
+
+
 
 Files Included:
 /README

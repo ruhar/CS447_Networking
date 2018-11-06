@@ -14,6 +14,7 @@
 #include <netinet/tcp.h>
 #include "common.hpp"
 #include <regex>
+#include <locale>
 
 using namespace std;
 using namespace cs447;
@@ -22,7 +23,31 @@ const int BUFFERSIZE = 64;
 
 void cs447::Hello()
 {
-    cout<<"Hello captain, waiting for probe commands!\n";
+    cout<<"Hello captain, waiting for probe commands!"<<endl;
+    cout<<"Usage:"<<endl;
+    cout<<"The following quick command will send all headers and track proper cseq numbers."<<endl;
+    cout<<"Quick Commands: setup, play, pause, teardown."<<endl;
+    cout<<"For long command info, type: help"<<endl;
+}
+void cs447::Help()
+{
+    cout<<"\n"<<endl;
+    cout<<"Setup Command:"<<endl;
+    cout<<"setup rtsp://localhost rtsp/2.0 <crlf>"<<endl;
+    cout<<"cseq:<sequencenumber> <crlf>"<<endl;
+    cout<<"transport:udp;unicast;dest_addr=\":<receiver-port>\""<<endl;
+    cout<<"sensor:<* or comma delimited t,p,o> <crlf>"<<endl<<endl;
+    cout<<"Play Command:"<<endl;
+    cout<<"play rtsp://localhost rtsp/2.0 <crlf>"<<endl;
+    cout<<"cseq:<sequencenumber> <crlf>"<<endl;
+    cout<<"sensor:<* or comma delimited t,p,o> <crlf>"<<endl<<endl;
+    cout<<"Pause Command:"<<endl;
+    cout<<"pause rtsp://localhost rtsp/2.0 <crlf>"<<endl;
+    cout<<"cseq:<sequencenumber> <crlf>"<<endl<<endl;
+    cout<<"Teardown Command:"<<endl;
+    cout<<"teardown rtsp://localhost rtsp/2.0 <crlf>"<<endl;
+    cout<<"cseq:<sequencenumber> <crlf>"<<endl<<endl;  
+    cout<<"Sensor header is optional. All cseq numbers must be next value, except setup."<<endl;
 }
 void cs447::Goodbye()
 {
@@ -59,6 +84,7 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
 {
     int socket = _TCPArguments.socket;
     char node[NI_MAXHOST];
+    locale loc;
     getnameinfo((struct sockaddr*)&_TCPArguments.address, sizeof(_TCPArguments.address), node, sizeof(node),NULL, 0, NI_NAMEREQD);
     string hostname(node);
     vector<string> hostparts;
@@ -66,14 +92,17 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
     hostname = hostparts[0];
     string input = "";
     string buffer = "";
-    while(input != "teardown")
+    while(buffer != "teardown")
     {
         input = "";
         getline(cin,input);
-        buffer = input;
+        buffer = "";
+        for(int i = 0; i < input.length();i++)
+        {
+            buffer += tolower(input[i],loc);
+        }
         if(buffer == "setup")
         {
-            cout<<"Setup"<<endl;
             sequence = 0;
             buffer = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
@@ -97,8 +126,6 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
         }
         else if(buffer == "play")
         {
-            cout<<"Play"<<endl;
-
             buffer = "play rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
@@ -118,8 +145,6 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
         }
         else if(buffer == "pause")
         {
-            cout<<"Pause"<<endl;
-
             buffer = "pause rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
@@ -134,7 +159,6 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
         }
         else if(buffer == "teardown")
         {
-            cout<<"Teardown"<<endl;
             buffer = "teardown rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));

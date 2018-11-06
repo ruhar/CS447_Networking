@@ -8,6 +8,7 @@
 namespace cs447
 {
     void Hello();
+    void Help();
     void Goodbye();
     void RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _ReceiverPort);
     void RTSPReceiver(tcpargs _TCPArguments);

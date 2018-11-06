@@ -203,7 +203,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 saddress.sin_addr.s_addr = inet_addr(recvIPAddress.c_str());
                 saddress.sin_port = htons(recvPort); 
                 string sending = "teardown";
-                cout<<sending<<endl;
                 sControl.SetPlaying(sck,false,false,false);
                 sendto(udpsck, sending.c_str(), sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
                 listening = false;
@@ -278,9 +277,13 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 recvPort = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
                 player.push_back(thread(RTSPPlay,sck,recvIPAddress,recvPort));
             }
-            else
+            else if(!cseqvalid)
             {
                 RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+            }
+            else if(!transportvalid)
+            {
+                RTSPSendResponse(sck,461,headers,HEADER::CONNECTION);
             }
         }
         else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
@@ -421,12 +424,14 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
         case 400:
             msg += "400 Bad Request\r\n";
             msg += _Headers.PrintHeader(_Header);
-            cout<<msg<<endl;
             break;
         case 456:
             msg += "456 Header Field Not Valid for Resource\r\n";
             msg += _Headers.PrintHeader(_Header);
-            cout<<msg<<endl;
+            break;
+        case 461:
+            msg += "461 Unsupported Transport\r\n";
+            msg += _Headers.PrintHeader(_Header);
             break;
         default:
             msg += _ResponseCode + "\r\n";

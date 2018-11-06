@@ -1,5 +1,23 @@
 INC = -I ./src/Common -I ./src/Server -I ./src/ControlClient -I ./src/Receiver
-all: dirs server controller receiver
+all: dirs server controller receiver help
+
+help:
+	@echo "Run:"
+	@echo "From the directory with *.app files in the following order"
+	@echo "Server"
+	@echo "./server.app <server-port> <oxygen.bin> <temperature.bin> <pressure.bin>"
+	@echo ""
+	@echo "Receiver"
+	@echo "./receiver.app <receiver-port>"
+	@echo ""
+	@echo "Controller"
+	@echo "./controller.app <hostname/server-ip> <server-port> <receiver-port>"
+	@echo ""
+	@echo "Example"
+	@echo "*Assuming sensor files are in same directory as executables"
+	@echo "./server.app 8100 ./oxygen.bin ./temperature.bin ./pressure.bin"
+	@echo "./receiver.app 4800"
+	@echo "./controller.app home.cs.siue.edu 8100 4800"
 
 dirs:
 	mkdir -p ./bin
