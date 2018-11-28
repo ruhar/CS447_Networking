@@ -14,4 +14,6 @@
         string GetUserName(string _EmailAddress);
         string GetCurrentDirectory();
         string GetHostName();
+        string EncodeBase64(string _ToEncode);
+        string DecodeBase64(string _ToDecode);
     }

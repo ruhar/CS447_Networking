@@ -12,6 +12,7 @@ int main(int argc, char const *argv[])
     try
     {
         Hello();
+        cout<<EncodeBase64("EatShit")<<endl;
         RTSPReceiverClient(stoi(argv[1]));
     }
     catch(const runtime_error &e)
