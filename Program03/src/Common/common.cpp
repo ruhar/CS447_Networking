@@ -266,26 +266,44 @@ string cs447::DecodeBase64(string _ToDecode)
 bool cs447::ValidateUser(string _Username, string _Password)
 {
     bool validuser = false;
+    bool userfound = false;
     string ePassword = EncodeBase64("CS447" + _Password);
-    string path = "./bin/.passwords/." + _Username + "_pass";
-
+    string path = "./bin/.passwords/.user_pass";
+    string userpass = _Username + "|" + ePassword;
     ifstream rfile(path,ios::in);
     if(rfile.good())
     {
-        //check for valid password
-        string password;
-        getline(rfile,password);
-        if(password == ePassword)
+        while(!rfile.eof() && userfound == false)
         {
-            validuser = true;
+            //check for valid password
+            string password;
+            vector<string> unamepword;
+            getline(rfile,password);
+            StringSplit(password,unamepword,'|');
+            if(unamepword.size() == 2 && unamepword[0] == _Username && unamepword[1] == ePassword)
+            {
+                validuser = true;
+                userfound = true;
+            }
+            else if(unamepword.size() == 2 && unamepword[0] == _Username)
+            {
+                userfound = true;
+            }
         }
         rfile.close();
+        if(!userfound)
+        {
+            ofstream wfile(path,ios::app);
+            wfile << userpass << endl;
+            wfile.close();
+            validuser = true;
+        }
     }
     else
     {
         //Create password file
         ofstream wfile(path,ios::out);
-        wfile << ePassword << endl;
+        wfile << userpass << endl;
         wfile.close();
         validuser = true;
     }

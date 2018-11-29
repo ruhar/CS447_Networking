@@ -12,15 +12,6 @@ int main(int argc, char const *argv[])
     try
     {
         Hello();
-        bool valid = ValidateUser("bhubler","EatMyCock");
-        if(valid)
-        {
-            cout<<"Good to go bitches!"<<endl;
-        }
-        else
-        {
-            cout<<"Crash and burn mother fucker!!!"<<endl;
-        }
         RTSPReceiverClient(stoi(argv[1]));
     }
     catch(const runtime_error &e)
