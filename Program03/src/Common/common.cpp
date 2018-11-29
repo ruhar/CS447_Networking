@@ -2,6 +2,7 @@
 #include "common.hpp"
 #include <regex>
 #include <iostream>
+#include <fstream>
 #include <unistd.h>
 #include <bitset>
 
@@ -108,33 +109,34 @@ void cs447::StringSplit(string _InputToSplit,vector<string> &_DelimitedOutput, c
 }
 string cs447::EncodeBase64(string _ToEncode)
 {
-    const int BITS = 6;
-    const string ZEROBITS = "000000";
+    const int ENCODEBITS = 6;
+    const int INPUTBITS = 8;
+    const string ENCODEZEROBITS = "000000";
+    const string INPUTZEROBITS = "00000000";
     string encoded = "";
-    string b64tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/";
+    string b64tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
     //Convert input string to bitset<8>
-    vector<bitset<8>> input;
-    vector<bitset<6>> venc;
+    vector<bitset<INPUTBITS>> input;
+    vector<bitset<ENCODEBITS>> venc;
     int count = 0;
     int bitcount = 0;
-    bitset<8> item("00000000");
+    bitset<INPUTBITS> item(INPUTZEROBITS);
 
-    for(int j = 0; j < _ToEncode.length(); j++)
+    for(uint j = 0; j < _ToEncode.length(); j++)
     {
         unsigned char uc = static_cast<unsigned char>(_ToEncode[j]);
-        cout<<"1:"<<(char)uc<<endl;
         for(int i = 0;i < 8;i++)
         {
             int bit = uc % 2;
             uc = (uc - bit)/2;
-            int setbit = (((count * 8) + i) % 8);
+            int setbit = (((count * INPUTBITS) + i) % INPUTBITS);
             item.set(setbit,bit);
             bitcount++;
             if(bitcount == 8)
             {
                 input.push_back(item);
-                cout<<"2: "<<item.to_string()<<endl;
-                item = bitset<8>("00000000");
+                item = bitset<INPUTBITS>(INPUTZEROBITS);
                 bitcount = 0;
             }
         }       
@@ -143,34 +145,18 @@ string cs447::EncodeBase64(string _ToEncode)
     if(bitcount > 0)
     {
         input.push_back(item);
-        cout<<"3: "<<item.to_string()<<endl;
     }
-    cout<<"test2"<<endl;
+
+    //Convert bitset<8> vector to bitset<6> vector
     bitcount = 0;
-    bitset<6> eitem("000000");
+    bitset<6> eitem(ENCODEZEROBITS);
     count = 0;
-    cout<<input.size()<<endl;
-    for(int i = 0; i < input.size(); i++)
+    for(uint i = 0; i < input.size(); i++)
     {
-        cout<<"test1"<<endl;
         string inp = input[i].to_string();
-        // for(int j = 7; j >= 0; j--)
-        // {
-        //     cout<<"test"<<endl;
-        //     int setbit = 6-(((count*8) - i) % 6);
-        //     eitem.set(setbit,input[i][j]);
-        //     bitcount++;
-        //     if(bitcount == 6)
-        //     {
-        //         cout<<eitem.to_string()<<endl;
-        //         venc.push_back(eitem);
-        //         eitem = bitset<6>("000000");
-        //         bitcount = 0;
-        //     }
-        // }
         for(int j = 0;j < 8;j++)
         {            
-            int setbit = 5 - (((count * 8) + j) % 6);
+            int setbit = 5 - (((count * INPUTBITS) + j) % ENCODEBITS);
             int bit = 0;
             if(inp[j] == '1')
             {
@@ -181,16 +167,20 @@ string cs447::EncodeBase64(string _ToEncode)
             if(bitcount == 6)
             {
                 venc.push_back(eitem);
-                cout<<"2: "<<eitem.to_string()<<endl;
-                eitem = bitset<6>("000000");
+                eitem = bitset<6>(ENCODEZEROBITS);
                 bitcount = 0;
             }
         }      
         count++;
     }
+    if(bitcount > 0)
+    {
+        venc.push_back(eitem);
+    }
+
+    // Encode bitset<6> vector
     for(uint i = 0; i < venc.size();i++)
     {
-        cout<<"4: "<< venc[i].to_ulong()<<endl;
         encoded += b64tbl[venc[i].to_ulong()];
     }
     //Append = as needed
@@ -198,9 +188,106 @@ string cs447::EncodeBase64(string _ToEncode)
     {
         encoded += "=";
     }
-    if((3-_ToEncode.length()%3) == 2)
+    else if((3-_ToEncode.length()%3) == 2)
     {
         encoded += "==";
     }
+
     return encoded;
+}
+string cs447::DecodeBase64(string _ToDecode)
+{
+    string decoded = "";
+    const int INPUTBITS = 6;
+    const int DECODEBITS = 8;
+    const string INPUTZEROBITS = "000000";
+    const string DECODEZEROBITS = "00000000";
+    string b64tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    vector<bitset<INPUTBITS>> input;
+
+    int bitcount = 0;
+    for(uint i = 0; i < _ToDecode.length(); i++)
+    {
+        uint index = b64tbl.find_first_of(_ToDecode[i]);
+        if(index < 65)
+        {
+            bitset<INPUTBITS> item(INPUTZEROBITS);
+            
+            for(int i = 0;i < INPUTBITS;i++)
+            {
+                int bit = index % 2;
+                index = (index - bit)/2;
+                int setbit = i;
+                item.set(setbit,bit);
+                bitcount++;
+                if(bitcount == INPUTBITS)
+                {
+                    input.push_back(item);
+                    item = bitset<INPUTBITS>(INPUTZEROBITS);
+                    bitcount = 0;
+                }
+            }       
+            if(bitcount > 0)
+            {
+                input.push_back(item);
+            }
+        }
+    }
+    //Convert bitset<6> to ASCII String
+    bitset<DECODEBITS> ditem(DECODEZEROBITS);
+    bitcount = 0;
+    for(uint i = 0; i < input.size(); i++)
+    {
+        string inp = input[i].to_string();
+        for(uint j = 0;j < inp.length(); j++)
+        {
+            int setbit = 7 - ((i * INPUTBITS) + j) % DECODEBITS;
+            int bit = 0;
+            if(inp[j] == '1')
+            {
+                bit = 1;
+            }
+            ditem.set(setbit,bit);
+            bitcount++;
+            if(bitcount == DECODEBITS)
+            {
+                decoded += (char)ditem.to_ulong();
+                ditem = bitset<DECODEBITS>(DECODEZEROBITS);
+                bitcount = 0;
+            }
+        }
+    }
+    if(bitcount > 0)
+    {
+        decoded += (char)ditem.to_ulong();
+    }
+    return decoded;
+}
+bool cs447::ValidateUser(string _Username, string _Password)
+{
+    bool validuser = false;
+    string ePassword = EncodeBase64("CS447" + _Password);
+    string path = "./bin/.passwords/." + _Username + "_pass";
+
+    ifstream rfile(path,ios::in);
+    if(rfile.good())
+    {
+        //check for valid password
+        string password;
+        getline(rfile,password);
+        if(password == ePassword)
+        {
+            validuser = true;
+        }
+        rfile.close();
+    }
+    else
+    {
+        //Create password file
+        ofstream wfile(path,ios::out);
+        wfile << ePassword << endl;
+        wfile.close();
+        validuser = true;
+    }
+    return validuser;
 }

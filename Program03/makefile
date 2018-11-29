@@ -24,6 +24,7 @@ dirs:
 	mkdir -p ./bin/server
 	mkdir -p ./bin/controller
 	mkdir -p ./bin/receiver
+	mkdir -p ./bin/.passwords
 
 server: sensorcontrolclient.o sensorcontrol.o rtspheaders.o tcpargs.o common.o server.o servermain.o 
 	g++ -g -pthread ./bin/server/sensorcontrolclient.o ./bin/server/sensorcontrol.o ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server/server.o ./bin/server/main.o -o ./server.app

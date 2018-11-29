@@ -16,4 +16,5 @@
         string GetHostName();
         string EncodeBase64(string _ToEncode);
         string DecodeBase64(string _ToDecode);
+        bool ValidateUser(string _Username, string _Password);
     }
