@@ -122,6 +122,7 @@ string cs447::EncodeBase64(string _ToEncode)
     for(int j = 0; j < _ToEncode.length(); j++)
     {
         unsigned char uc = static_cast<unsigned char>(_ToEncode[j]);
+        cout<<"1:"<<(char)uc<<endl;
         for(int i = 0;i < 8;i++)
         {
             int bit = uc % 2;
@@ -144,16 +145,48 @@ string cs447::EncodeBase64(string _ToEncode)
         input.push_back(item);
         cout<<"3: "<<item.to_string()<<endl;
     }
-
+    cout<<"test2"<<endl;
     bitcount = 0;
     bitset<6> eitem("000000");
-    for(uint i = 0; i < input.size(); i++)
+    count = 0;
+    cout<<input.size()<<endl;
+    for(int i = 0; i < input.size(); i++)
     {
-        for(uint j = 7; j >= 0; j--)
-        {
-            int setbit = (((count * 8) + i) % 8);
-            eitem.set(setbit,input[i][j]);
-        }
+        cout<<"test1"<<endl;
+        string inp = input[i].to_string();
+        // for(int j = 7; j >= 0; j--)
+        // {
+        //     cout<<"test"<<endl;
+        //     int setbit = 6-(((count*8) - i) % 6);
+        //     eitem.set(setbit,input[i][j]);
+        //     bitcount++;
+        //     if(bitcount == 6)
+        //     {
+        //         cout<<eitem.to_string()<<endl;
+        //         venc.push_back(eitem);
+        //         eitem = bitset<6>("000000");
+        //         bitcount = 0;
+        //     }
+        // }
+        for(int j = 0;j < 8;j++)
+        {            
+            int setbit = 5 - (((count * 8) + j) % 6);
+            int bit = 0;
+            if(inp[j] == '1')
+            {
+                bit = 1;
+            }
+            eitem.set(setbit,bit);
+            bitcount++;
+            if(bitcount == 6)
+            {
+                venc.push_back(eitem);
+                cout<<"2: "<<eitem.to_string()<<endl;
+                eitem = bitset<6>("000000");
+                bitcount = 0;
+            }
+        }      
+        count++;
     }
     for(uint i = 0; i < venc.size();i++)
     {
