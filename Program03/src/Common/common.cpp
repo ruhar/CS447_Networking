@@ -5,6 +5,8 @@
 #include <fstream>
 #include <unistd.h>
 #include <bitset>
+#include <chrono>
+#include <thread>
 
 using namespace std;
 
@@ -268,7 +270,7 @@ bool cs447::ValidateUser(string _Username, string _Password)
     bool validuser = false;
     bool userfound = false;
     string ePassword = EncodeBase64("CS447" + _Password);
-    string path = "./bin/.passwords/.user_pass";
+    string path = "./.passwords/.user_pass";
     string userpass = _Username + "|" + ePassword;
     ifstream rfile(path,ios::in);
     if(rfile.good())
@@ -308,4 +310,18 @@ bool cs447::ValidateUser(string _Username, string _Password)
         validuser = true;
     }
     return validuser;
+}
+void cs447::ServerLog(string _SrcIP, string _DestIP, string _ProtocolCmd, string _Code, string _Description)
+{
+    string path = "./.logs/.server_log";
+    ofstream ofile(path,ios::app);
+    while(!ofile.good())
+    {
+        chrono::milliseconds wait(10);
+        this_thread::sleep_for(wait);
+        ofile.open(path,ios::app);
+    }
+    string timestamp = GetCurrentTimeStamp();
+    ofile<<timestamp + " " + _SrcIP + " " + _DestIP + " " + _ProtocolCmd + " " + _Code + " " + _Description<<endl;
+    ofile.close();
 }

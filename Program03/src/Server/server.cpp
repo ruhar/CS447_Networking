@@ -86,7 +86,7 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
     {
         throw runtime_error("Unable to listien on port " + to_string(_Port));
     }
-    cout<<"Waiting for TCP Connections on port "<<_Port<<"\n"<<endl;
+    cout<<"Waiting for TCP Connections at "<< inet_ntoa(saddress.sin_addr) <<" on port "<<_Port<<"\n"<<endl;
     struct sockaddr_in caddress;
     vector<std::thread> server_thread;
     while(true)
@@ -124,7 +124,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     getsockname(sck, (struct sockaddr *)&addr, &addr_size);
     string serverIP = inet_ntoa(addr.sin_addr);
     string serverPort = to_string(ntohs(addr.sin_port));
-
     sControl.AddClient(sck);
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
@@ -132,7 +131,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     headers.Headers[(int)HEADER::CONNECTION].Date = GetCurrentTimeStamp();
     cout<<"Opening RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
     cout<<" Socket: "<<sck<<endl;
-    RTSPSendResponse(sck,200,headers,HEADER::CONNECTION);
+    RTSPSendResponse(sck,200,headers,HEADER::CONNECTION,serverIP);
     int lostconn = 0;
     vector<string> msg;
     vector<string> setupmsg;
@@ -196,7 +195,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             if(cseqvalid)
             {
                 headers.CSeq = teardowncseq;
-                RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN);
+                RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN,serverIP);
                 int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
                 struct sockaddr_in saddress;
                 saddress.sin_family = AF_INET; 
@@ -209,7 +208,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }
             else
             {
-                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);  
+                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION,serverIP);  
             }
             lostconn = 0;
         }
@@ -272,18 +271,18 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             }while(dataentry);
             if(transportvalid && cseqvalid)
             {
-                RTSPSendResponse(sck,200,headers,HEADER::SETUP);
+                RTSPSendResponse(sck,200,headers,HEADER::SETUP,serverIP);
                 recvIPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
                 recvPort = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
                 player.push_back(thread(RTSPPlay,sck,recvIPAddress,recvPort));
             }
             else if(!cseqvalid)
             {
-                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP);
             }
             else if(!transportvalid)
             {
-                RTSPSendResponse(sck,461,headers,HEADER::CONNECTION);
+                RTSPSendResponse(sck,461,headers,HEADER::CONNECTION,serverIP);
             }
         }
         else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
@@ -339,11 +338,11 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 }
                 headers.CSeq = playseq;
                 sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
-                RTSPSendResponse(sck,200,headers,HEADER::PLAY);
+                RTSPSendResponse(sck,200,headers,HEADER::PLAY,serverIP);
             }
             else
             {
-                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP);
             }         
             lostconn = 0;
         }
@@ -386,12 +385,12 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             if(cseqvalid)
             {
                 headers.CSeq = pauseseq;
-                RTSPSendResponse(sck,200,headers,HEADER::PAUSE);
+                RTSPSendResponse(sck,200,headers,HEADER::PAUSE,serverIP);
                 sControl.SetPlaying(sck,false,false,false);
             }   
             else
             {
-                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION);
+                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP);
             }         
         }
         else if(rcvdmsglength == 0)
@@ -400,7 +399,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         }
         else
         {
-            RTSPSendResponse(sck,400,headers,HEADER::CONNECTION);
+            RTSPSendResponse(sck,400,headers,HEADER::CONNECTION,serverIP);
         }
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<inet_ntoa(socketaddress.sin_addr)<<endl;
@@ -411,7 +410,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     }
     close(sck);
 }
-int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header)
+int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header, string _ServerIP)
 {
     string msg = "RTSP/2.0 ";
     _Headers.Headers[(int)_Header].Date = GetCurrentTimeStamp();
@@ -436,7 +435,8 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
         default:
             msg += _ResponseCode + "\r\n";
             break;
-    }
+    }    
+    thread(ServerLog,_ServerIP,"","",to_string(_ResponseCode),"");
     return send(_ClientSocket,msg.c_str(),msg.size(),0);
 }
 void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName, int &_MaxReadings)
