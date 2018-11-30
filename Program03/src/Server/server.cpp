@@ -23,6 +23,8 @@
 #include <math.h>
 #include <bitset>
 #include <chrono>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 using namespace std;
 using namespace cs447;
@@ -93,7 +95,7 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
     {
         socklen_t caddr_length = sizeof(caddress);
         sckaccept = accept(sck,(struct sockaddr *) &caddress,&caddr_length);
-
+    
         if(sckaccept < 0)
         {
             cout<<"Client connection refused from: "<<inet_ntoa(caddress.sin_addr)<<endl;
@@ -109,9 +111,35 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
 }
 void cs447::RTSPServerHandler(tcpargs _sckinfo)
 {
+    int sck = _sckinfo.socket;
+    sockaddr_in socketaddress = _sckinfo.address;
+    
+    //SSL Setup
+    const SSL_METHOD *method;
+    method = TLSv1_2_server_method();
+    SSL_CTX *ctx;
+    //ssl initialize
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+    //ssl context
+    ctx = SSL_CTX_new(method);
+    SSL_CTX_set_ecdh_auto(ctx,1);
+    //ssl set private key and cert
+    SSL_CTX_use_certificate_file(ctx,"bhubler_cs447.pem",SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx,"bhubler_cs447.pem",SSL_FILETYPE_PEM);
+    SSL *ssl;
+    ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, sck);
+    int sslaccept = SSL_accept(ssl);
+    if(sslaccept < 0)
+    {
+        close(sck);
+        throw runtime_error("SSL Socket Accept error");
+    }
+
     bool listening = true;
     RTSPHeaders headers = RTSPHeaders();
-    //Create Unauthorized header and send message
+    //Create Unauthorized header
     headers.Headers[(int)HEADER::UNAUTHORIZED].Authenticate = "Basic realm=\"CS447F18\"";
     vector<std::thread> player;
     bool uservalid = false;
@@ -120,8 +148,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     string recvIPAddress = "";
     int recvPort = 0;
     string hostname = GetHostName();    
-    int sck = _sckinfo.socket;
-    sockaddr_in socketaddress = _sckinfo.address;
+
     string clientIP = inet_ntoa(socketaddress.sin_addr);
     struct sockaddr_in addr;
     socklen_t addr_size = sizeof(struct sockaddr_in);
@@ -144,7 +171,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         int rcvdmsglength;
         try
         {
-            rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+            // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+            rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
         }
         catch(exception er)
         {
@@ -154,7 +182,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
         {
             memset(buffer, 0, BUFFERSIZE);
-            rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+            // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+            rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
@@ -171,12 +200,14 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             {
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
-                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
-                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -236,12 +267,14 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             {
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
-                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
-                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -347,12 +380,14 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             {
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
-                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
-                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -414,12 +449,14 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             {
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
-                rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
-                    rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
+                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -525,6 +562,8 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
             break;
     }    
     thread(ServerLog,_ServerIP,_ClientIP,_Command,Description).detach();
+
+    return SSL_write(_ClientSocket,msg.c_str(),msg.size());
     return send(_ClientSocket,msg.c_str(),msg.size(),0);
 }
 void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName, int &_MaxReadings)
