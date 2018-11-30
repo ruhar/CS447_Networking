@@ -17,5 +17,5 @@
         string EncodeBase64(string _ToEncode);
         string DecodeBase64(string _ToDecode);
         bool ValidateUser(string _Username, string _Password);
-        void ServerLog(string _SrcIP, string _DestIP, string _ProtocolCmd, string _Code, string _Description);
+        void ServerLog(string _SrcIP, string _DestIP, string _ProtocolCmd, string _Description);
     }

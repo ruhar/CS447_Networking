@@ -13,7 +13,7 @@ namespace cs447
     void Hello();
     void Goodbye();
     void RTSPServer(int _Port, std::string _OxygenFile, std::string _TemperatureFile, std::string _PressureFile);
-    int RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, cs447::HEADER _Header, std::string _ServerIP);
+    int RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, cs447::HEADER _Header, std::string _ServerIP, std::string _ClientIP, std::string _Command);
     int DeliverEmail(std::string _Email[],std::string _Path);
     void RTSPServerHandler(tcpargs _sckinfo);
     void UDPServer(int _Port);

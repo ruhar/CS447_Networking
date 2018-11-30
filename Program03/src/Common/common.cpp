@@ -311,7 +311,7 @@ bool cs447::ValidateUser(string _Username, string _Password)
     }
     return validuser;
 }
-void cs447::ServerLog(string _SrcIP, string _DestIP, string _ProtocolCmd, string _Code, string _Description)
+void cs447::ServerLog(string _SrcIP, string _DestIP, string _ProtocolCmd, string _Description)
 {
     string path = "./.logs/.server_log";
     ofstream ofile(path,ios::app);
@@ -322,6 +322,6 @@ void cs447::ServerLog(string _SrcIP, string _DestIP, string _ProtocolCmd, string
         ofile.open(path,ios::app);
     }
     string timestamp = GetCurrentTimeStamp();
-    ofile<<timestamp + " " + _SrcIP + " " + _DestIP + " " + _ProtocolCmd + " " + _Code + " " + _Description<<endl;
+    ofile<<timestamp + " " + _SrcIP + " " + _DestIP + " " + _ProtocolCmd + " " + _Description<<endl;
     ofile.close();
 }
