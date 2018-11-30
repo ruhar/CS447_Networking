@@ -6,7 +6,7 @@
 namespace cs447
 {
     enum class SENSOR{OXYGEN=0, PRESSURE, TEMPERATURE};
-    enum class HEADER{SETUP=0, PLAY, PAUSE, TEARDOWN, CONNECTION};
+    enum class HEADER{SETUP=0, PLAY, PAUSE, TEARDOWN, CONNECTION, UNAUTHORIZED, FORBIDDEN};
     class Transport
     {
         public:
@@ -25,6 +25,7 @@ namespace cs447
             std::string Sensor;
             std::string Date;
             Transport TransportInfo;
+            std::string Authenticate;
             // std::string PrintHeader();
             std::vector<bool> Sensors;
             bool SetSensor(std::string _Sensors);
@@ -35,7 +36,7 @@ namespace cs447
     {
         public:
             int CSeq;
-            rtspheader Headers[5];
+            rtspheader Headers[7];
             std::string PrintHeader(cs447::HEADER _header);
             RTSPHeaders();
     };

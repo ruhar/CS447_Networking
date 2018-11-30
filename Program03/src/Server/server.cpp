@@ -111,9 +111,12 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
 {
     bool listening = true;
     RTSPHeaders headers = RTSPHeaders();
+    //Create Unauthorized header and send message
+    headers.Headers[(int)HEADER::UNAUTHORIZED].Authenticate = "Basic realm=\"CS447F18\"";
     vector<std::thread> player;
     bool uservalid = false;
-    int authatries = 0;
+    bool authfail = false;
+    int authretry = 0;
     string recvIPAddress = "";
     int recvPort = 0;
     string hostname = GetHostName();    
@@ -133,11 +136,10 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     cout<<"Opening RTSP Control Thread for client IP: "<<clientIP<<endl;
     cout<<" Socket: "<<sck<<endl;
     RTSPSendResponse(sck,200,headers,HEADER::CONNECTION,serverIP,clientIP,"CONNECT");
-    cout<<"3"<<endl;
     int lostconn = 0;
     vector<string> msg;
     vector<string> setupmsg;
-    while(listening && lostconn < 10)
+    while(listening && lostconn < 10 && authretry < 2)
     {
         int rcvdmsglength;
         try
@@ -194,23 +196,31 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     dataentry = false;
                 }
             }while(dataentry);
-            if(cseqvalid)
+            if(uservalid)
             {
-                headers.CSeq = teardowncseq;
-                RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN,serverIP,clientIP,"TEARDOWN");
-                int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
-                struct sockaddr_in saddress;
-                saddress.sin_family = AF_INET; 
-                saddress.sin_addr.s_addr = inet_addr(recvIPAddress.c_str());
-                saddress.sin_port = htons(recvPort); 
-                string sending = "teardown";
-                sControl.SetPlaying(sck,false,false,false);
-                sendto(udpsck, sending.c_str(), sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
-                listening = false;
+
+                if(cseqvalid)
+                {
+                    headers.CSeq = teardowncseq;
+                    RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN,serverIP,clientIP,"TEARDOWN");
+                    int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+                    struct sockaddr_in saddress;
+                    saddress.sin_family = AF_INET; 
+                    saddress.sin_addr.s_addr = inet_addr(recvIPAddress.c_str());
+                    saddress.sin_port = htons(recvPort); 
+                    string sending = "teardown";
+                    sControl.SetPlaying(sck,false,false,false);
+                    sendto(udpsck, sending.c_str(), sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
+                    listening = false;
+                }
+                else
+                {
+                    RTSPSendResponse(sck,400,headers,HEADER::CONNECTION,serverIP,clientIP,"TEARDOWN");  
+                }
             }
             else
             {
-                RTSPSendResponse(sck,400,headers,HEADER::CONNECTION,serverIP,clientIP,"TEARDOWN");  
+                RTSPSendResponse(sck,401,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"TEARDOWN");
             }
             lostconn = 0;
         }
@@ -221,6 +231,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
             bool transportvalid = false;
             lostconn = 0;
             bool dataentry = true;
+            int cseq = 0;
             do
             {
                 int rcvdmsglength;
@@ -239,8 +250,9 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     rcvdmsg = regex_replace(rcvdmsg,regex("^(cseq:)",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
                     rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");                    
-                    headers.CSeq = stoi(trim(rcvdmsg));
-                    cseqvalid = true;
+                    cseq = stoi(trim(rcvdmsg));
+                    headers.CSeq = cseq;
+                    cseqvalid = true;                    
                 }
                 if(regex_match(rcvdmsg,regex("(sensor:){1}( ){0,}((([otp*]){1},([otp]){1},([otp]){1})|(([otp*]){1},([otp]){1})|(([otp*]){1}))(\\s){0,}",regex::icase)))
                 {
@@ -266,25 +278,61 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     headers.Headers[(int)HEADER::SETUP].TransportInfo.SrcPort = serverPort;
                     transportvalid = true;
                 }
+                if(regex_match(rcvdmsg,regex("(authorization:){1}( ){0,}(basic)( ){1,}.{1,}(\\s){0,}",regex::icase)))
+                {
+                    rcvdmsg = regex_replace(rcvdmsg,regex("^(authorization:){1}( ){0,}(basic)( ){1,}",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\n",regex::icase),"");
+                    rcvdmsg = regex_replace(rcvdmsg,regex("\\r",regex::icase),"");
+                    string auth;
+                    auth = DecodeBase64(rcvdmsg);
+                    vector<string> unpwd;
+                    StringSplit(auth,unpwd,':');
+                    if(unpwd.size() == 2)
+                    {
+                        string username = unpwd[0];
+                        string password = unpwd[1];
+                        uservalid = ValidateUser(username,password);
+                        if(!uservalid)
+                        {
+                            authfail = true;
+                        }
+                    }
+                }
                 if((rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10))
                 {
                     dataentry = false;
                 }
             }while(dataentry);
-            if(transportvalid && cseqvalid)
+            if(uservalid)
             {
-                RTSPSendResponse(sck,200,headers,HEADER::SETUP,serverIP,clientIP,"SETUP");
-                recvIPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
-                recvPort = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
-                player.push_back(thread(RTSPPlay,sck,recvIPAddress,recvPort));
+                authretry = 0;
+                if(transportvalid && cseqvalid)
+                {
+                    RTSPSendResponse(sck,200,headers,HEADER::SETUP,serverIP,clientIP,"SETUP");
+                    recvIPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
+                    recvPort = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
+                    player.push_back(thread(RTSPPlay,sck,recvIPAddress,recvPort));
+                }
+                else if(!cseqvalid)
+                {
+                    RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP,clientIP,"SETUP");
+                }
+                else if(!transportvalid)
+                {
+                    RTSPSendResponse(sck,461,headers,HEADER::CONNECTION,serverIP,clientIP,"SETUP");
+                }
             }
-            else if(!cseqvalid)
+            else
             {
-                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP,clientIP,"SETUP");
-            }
-            else if(!transportvalid)
-            {
-                RTSPSendResponse(sck,461,headers,HEADER::CONNECTION,serverIP,clientIP,"SETUP");
+                if(authfail)
+                {
+                    RTSPSendResponse(sck,403,headers,HEADER::FORBIDDEN,serverIP,clientIP,"SETUP");
+                    authretry++;
+                }
+                else
+                {
+                    RTSPSendResponse(sck,401,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"SETUP");
+                }
             }
         }
         else if(regex_match(rcvdmsg,regex("play rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
@@ -332,20 +380,27 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     dataentry = false;
                 }
             }while(dataentry);
-            if(cseqvalid)
+            if(uservalid)
             {
-                if(!setsensor)
+                if(cseqvalid)
                 {
-                    headers.Headers[(int)HEADER::PLAY].SetSensor("*");
+                    if(!setsensor)
+                    {
+                        headers.Headers[(int)HEADER::PLAY].SetSensor("*");
+                    }
+                    headers.CSeq = playseq;
+                    sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
+                    RTSPSendResponse(sck,200,headers,HEADER::PLAY,serverIP,clientIP,"PLAY");
                 }
-                headers.CSeq = playseq;
-                sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
-                RTSPSendResponse(sck,200,headers,HEADER::PLAY,serverIP,clientIP,"PLAY");
+                else
+                {
+                    RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP,clientIP,"PLAY");
+                }         
             }
             else
             {
-                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP,clientIP,"PLAY");
-            }         
+                RTSPSendResponse(sck,401,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"PLAY");
+            }
             lostconn = 0;
         }
         else if(regex_match(rcvdmsg,regex("pause rtsp:\\/\\/([0-9a-z]){1}([\\-0-9a-z]){0,}(\\/){0,1} rtsp\\/2.0(\\s){0,}",regex::icase)) ||
@@ -384,16 +439,23 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     dataentry = false;
                 }
             }while(dataentry);
-            if(cseqvalid)
+            if(uservalid)
             {
-                headers.CSeq = pauseseq;
-                RTSPSendResponse(sck,200,headers,HEADER::PAUSE,serverIP,clientIP,"PAUSE");
-                sControl.SetPlaying(sck,false,false,false);
-            }   
+                if(cseqvalid)
+                {
+                    headers.CSeq = pauseseq;
+                    RTSPSendResponse(sck,200,headers,HEADER::PAUSE,serverIP,clientIP,"PAUSE");
+                    sControl.SetPlaying(sck,false,false,false);
+                }   
+                else
+                {
+                    RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP,clientIP,"PAUSE");
+                } 
+            }
             else
             {
-                RTSPSendResponse(sck,456,headers,HEADER::CONNECTION,serverIP,clientIP,"PAUSE");
-            }         
+                RTSPSendResponse(sck,401,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"PAUSE");
+            }    
         }
         else if(rcvdmsglength == 0)
         {
@@ -403,6 +465,10 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         {
             RTSPSendResponse(sck,400,headers,HEADER::CONNECTION,serverIP,clientIP,"UNKNOWN");
         }
+    }
+    if(!uservalid)
+    {
+        RTSPSendResponse(sck,410,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"SETUP");
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<clientIP<<endl;
     sControl.DisconnectClient(sck);
@@ -426,8 +492,22 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
             break;
         case 400:
             Description = "400 Bad Request";
-            msg += Description + "400 Bad Request\r\n";
+            msg += Description + "\r\n";
             msg += _Headers.PrintHeader(_Header);
+            break;
+        case 401:
+            Description = "401 Unauthorized";
+            msg += Description + "\r\n";
+            msg += _Headers.PrintHeader(_Header);
+            break;
+        case 403:
+            Description = "403 Forbidden";
+            msg += Description + "\r\n";
+            msg += _Headers.PrintHeader(_Header);
+            break;
+        case 410:
+            Description = "410 Gone";
+            msg += Description + "\r\n";
             break;
         case 456:
             Description = "456 Header Field Not Valid for Resource";

@@ -26,7 +26,7 @@ void cs447::Hello()
     cout<<"Hello captain, waiting for probe commands!"<<endl;
     cout<<"Usage:"<<endl;
     cout<<"The following quick command will send all headers and track proper cseq numbers."<<endl;
-    cout<<"Quick Commands: setup, play, pause, teardown."<<endl;
+    cout<<"Quick Commands: setup, setupauth, play, pause, teardown."<<endl;
     cout<<"For long command info, type: help"<<endl;
 }
 void cs447::Help()
@@ -99,7 +99,7 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
         buffer = input;
         if(regex_match(buffer,regex("( ){0,}setup( ){0,}(\\s){0,}",regex::icase)))
         {
-            sequence = 0;
+            //sequence = 0;
             buffer = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
@@ -116,6 +116,33 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));
 
+            buffer = "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+        }
+        else if(regex_match(buffer,regex("( ){0,}setupauth( ){0,}(\\s){0,}",regex::icase)))
+        {
+            //sequence = 0;
+            buffer = "setup rtsp://" + hostname + " rtsp/2.0\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            buffer = "cseq:" + to_string(sequence) + "\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            buffer = "transport:UDP;unicast;dest_addr=\":" + to_string(_ReceiverPort) + "\"\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            buffer = "sensor:*\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
+
+            // buffer = "Authorization: Basic aGFkZG9jazpwaXJhdGVzIQ==\r\n";
+            buffer = "Authorization: Basic aGFkZG9jazpwaXJhdGVz\r\n";
+            send(socket,buffer.c_str(),buffer.length(),0);
+            this_thread::sleep_for(chrono::milliseconds(100));
             buffer = "\r\n";
             send(socket,buffer.c_str(),buffer.length(),0);
             this_thread::sleep_for(chrono::milliseconds(100));

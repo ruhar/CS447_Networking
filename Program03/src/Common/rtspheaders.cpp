@@ -57,6 +57,7 @@ rtspheader::rtspheader()
     std::string CSeq;
     std::string Date;
     std::string Sensor;
+    std::string Authenticate;
     // std::string Transport;
     std::string printheaders(); 
     Sensors.push_back(false);
@@ -102,6 +103,8 @@ RTSPHeaders::RTSPHeaders()
     Headers[(int)HEADER::PAUSE] = rtspheader();
     Headers[(int)HEADER::TEARDOWN] = rtspheader();
     Headers[(int)HEADER::CONNECTION] = rtspheader();
+    Headers[(int)HEADER::UNAUTHORIZED] = rtspheader();
+    Headers[(int)HEADER::FORBIDDEN] = rtspheader();
 }
 string RTSPHeaders::PrintHeader(cs447::HEADER _header)
 {
@@ -119,6 +122,10 @@ string RTSPHeaders::PrintHeader(cs447::HEADER _header)
     if(Headers[(int)_header].Sensor != "")
     {
         value += "Sensor: " + Headers[(int)_header].Sensor + "\r\n";
+    }
+    if(Headers[(int)_header].Authenticate != "")
+    {
+        value += "WWW-Authenticate: " + Headers[(int)_header].Authenticate + "\r\n";
     }
     return value;
 }
