@@ -57,6 +57,26 @@ void cs447::Goodbye()
     cout<<"Thank you for using sensor probing services!\n";    
 }
 
+void ShowCerts(SSL* ssl)
+{   X509 *cert;
+    char *line;
+ 
+    cert = SSL_get_peer_certificate(ssl); /* Get certificates (if available) */
+    if ( cert != NULL )
+    {
+        printf("Server certificates:\n");
+        line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
+        printf("Subject: %s\n", line);
+        free(line);
+        line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
+        printf("Issuer: %s\n", line);
+        free(line);
+        X509_free(cert);
+    }
+    else
+        printf("No certificates.\n");
+}
+
 void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, string _PressureFile)
 {
     thread o(ReadOxygenSensor,std::ref(oxygen),_OxygenFile,std::ref(maxoxygen));
@@ -111,15 +131,15 @@ void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, s
 }
 void cs447::RTSPServerHandler(tcpargs _sckinfo)
 {
-    int sck = _sckinfo.socket;
+    int clntsck = _sckinfo.socket;
     sockaddr_in socketaddress = _sckinfo.address;
-    
     //SSL Setup
     const SSL_METHOD *method;
-    method = TLSv1_2_server_method();
+    method = TLS_server_method();
     SSL_CTX *ctx;
     //ssl initialize
     SSL_load_error_strings();
+    ERR_print_errors_fp(stderr);
     OpenSSL_add_all_algorithms();
     //ssl context
     ctx = SSL_CTX_new(method);
@@ -127,15 +147,25 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     //ssl set private key and cert
     SSL_CTX_use_certificate_file(ctx,"bhubler_cs447.pem",SSL_FILETYPE_PEM);
     SSL_CTX_use_PrivateKey_file(ctx,"bhubler_cs447.pem",SSL_FILETYPE_PEM);
-    SSL *ssl;
-    ssl = SSL_new(ctx);
-    SSL_set_fd(ssl, sck);
-    int sslaccept = SSL_accept(ssl);
+    if ( !SSL_CTX_check_private_key(ctx) )
+    {
+        fprintf(stderr, "Private key does not match the public certificate\n");
+        abort();
+    }
+    SSL *sck;
+    sck = SSL_new(ctx);
+    SSL_set_fd(sck, clntsck);
+    int sslaccept = SSL_accept(sck);
     if(sslaccept < 0)
     {
-        close(sck);
-        throw runtime_error("SSL Socket Accept error");
+        // cout<<"Error: "<<to_string(sslaccept)<<":"<<strerror(errno)<<endl;
+        // ERR_print_errors_fp(stderr);
+        // close(clntsck);
+        // throw runtime_error("SSL Socket Accept error\n");
     }
+    ShowCerts(sck);
+
+
 
     bool listening = true;
     RTSPHeaders headers = RTSPHeaders();
@@ -144,6 +174,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     vector<std::thread> player;
     bool uservalid = false;
     bool authfail = false;
+    bool rcvconnected = false;
     int authretry = 0;
     string recvIPAddress = "";
     int recvPort = 0;
@@ -152,10 +183,10 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     string clientIP = inet_ntoa(socketaddress.sin_addr);
     struct sockaddr_in addr;
     socklen_t addr_size = sizeof(struct sockaddr_in);
-    getsockname(sck, (struct sockaddr *)&addr, &addr_size);
+    getsockname(clntsck, (struct sockaddr *)&addr, &addr_size);
     string serverIP = inet_ntoa(addr.sin_addr);
     string serverPort = to_string(ntohs(addr.sin_port));
-    sControl.AddClient(sck);
+    sControl.AddClient(clntsck);
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
     headers.CSeq = 0;
@@ -172,7 +203,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         try
         {
             // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-            rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+            rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
         }
         catch(exception er)
         {
@@ -183,7 +214,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         {
             memset(buffer, 0, BUFFERSIZE);
             // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-            rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+            rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
             rcvdmsg += buffer;
         }
         memset(buffer, 0, BUFFERSIZE);
@@ -201,13 +232,13 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
                 // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
                     // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                    rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -222,10 +253,12 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         teardowncseq = stoi(trim(rcvdmsg));
                     }
                 }
-                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                // if((rcvdmsglength <= 2) && ((rcvdmsg[0] == 13 && rcvdmsg[1] == 10) || (rcvdmsg[0] == 13) || (rcvdmsg[0] == 10)))
+                if(regex_match(rcvdmsg,regex("^(\\s){0,2}",regex::icase)))
                 {
                     dataentry = false;
                 }
+                cout<<"Message:"<<rcvdmsg<<"|Length:"<<rcvdmsglength<<endl;
             }while(dataentry);
             if(uservalid)
             {
@@ -240,7 +273,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     saddress.sin_addr.s_addr = inet_addr(recvIPAddress.c_str());
                     saddress.sin_port = htons(recvPort); 
                     string sending = "teardown";
-                    sControl.SetPlaying(sck,false,false,false);
+                    sControl.SetPlaying(clntsck,false,false,false);
                     sendto(udpsck, sending.c_str(), sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
                     listening = false;
                 }
@@ -268,13 +301,13 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
                 // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
                     // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                    rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -331,7 +364,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         }
                     }
                 }
-                if((rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10))
+                // if((rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10))
+                if(regex_match(rcvdmsg,regex("^(\\s){0,2}",regex::icase)))
                 {
                     dataentry = false;
                 }
@@ -344,7 +378,12 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     RTSPSendResponse(sck,200,headers,HEADER::SETUP,serverIP,clientIP,"SETUP");
                     recvIPAddress = headers.Headers[(int)HEADER::SETUP].TransportInfo.DestAddress;
                     recvPort = stoi(headers.Headers[(int)HEADER::SETUP].TransportInfo.DestPort);
-                    player.push_back(thread(RTSPPlay,sck,recvIPAddress,recvPort));
+                    //Add new thread if first time
+                    if(!rcvconnected)
+                    {
+                        player.push_back(thread(RTSPPlay,clntsck,recvIPAddress,recvPort));
+                        rcvconnected = true;
+                    }
                 }
                 else if(!cseqvalid)
                 {
@@ -381,13 +420,13 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
                 // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
                     // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                    rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -410,7 +449,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     headers.Headers[(int)HEADER::PLAY].SetSensor(trim(rcvdmsg));
                     setsensor = true;
                 }
-                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                // if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                if(regex_match(rcvdmsg,regex("^(\\s){0,2}",regex::icase)))
                 {
                     dataentry = false;
                 }
@@ -424,7 +464,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         headers.Headers[(int)HEADER::PLAY].SetSensor("*");
                     }
                     headers.CSeq = playseq;
-                    sControl.SetPlaying(sck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
+                    cout<<"Socket: "<<to_string(clntsck)<<endl;
+                    sControl.SetPlaying(clntsck,headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::OXYGEN],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::TEMPERATURE],headers.Headers[(int)HEADER::PLAY].Sensors[(int)SENSOR::PRESSURE]);
                     RTSPSendResponse(sck,200,headers,HEADER::PLAY,serverIP,clientIP,"PLAY");
                 }
                 else
@@ -450,13 +491,13 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 int rcvdmsglength;
                 memset(buffer, 0, BUFFERSIZE);
                 // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                 string rcvdmsg(buffer);
                 while(rcvdmsglength == BUFFERSIZE && buffer[rcvdmsglength - 1] != 10)
                 {
                     memset(buffer, 0, BUFFERSIZE);
                     // rcvdmsglength = recv(sck,buffer,BUFFERSIZE,0);
-                    rcvdmsglength = SSL_read(ssl,buffer,BUFFERSIZE);
+                    rcvdmsglength = SSL_read(sck,buffer,BUFFERSIZE);
                     rcvdmsg += buffer;
                 }
                 rcvdmsglength = rcvdmsg.length();
@@ -471,7 +512,8 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                         pauseseq = stoi(trim(rcvdmsg));
                     }
                 }
-                if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                // if(rcvdmsglength == 2 && rcvdmsg[0] == 13 && rcvdmsg[1] == 10)
+                if(regex_match(rcvdmsg,regex("^(\\s){0,2}",regex::icase)))
                 {
                     dataentry = false;
                 }
@@ -482,7 +524,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 {
                     headers.CSeq = pauseseq;
                     RTSPSendResponse(sck,200,headers,HEADER::PAUSE,serverIP,clientIP,"PAUSE");
-                    sControl.SetPlaying(sck,false,false,false);
+                    sControl.SetPlaying(clntsck,false,false,false);
                 }   
                 else
                 {
@@ -508,14 +550,15 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
         RTSPSendResponse(sck,410,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"SETUP");
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<clientIP<<endl;
-    sControl.DisconnectClient(sck);
+    sControl.DisconnectClient(clntsck);
     for(uint i = 0; i < player.size(); i++)
     {
         player[i].join();
     }
-    close(sck);
+    close(clntsck);
 }
-int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header, string _ServerIP, string _ClientIP, string _Command)
+// int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header, string _ServerIP, string _ClientIP, string _Command)
+int cs447::RTSPSendResponse(SSL *_ClientSocket, int _ResponseCode, RTSPHeaders &_Headers, HEADER _Header, string _ServerIP, string _ClientIP, string _Command)
 {
     string msg = "RTSP/2.0 ";
     string Description = "";
@@ -562,9 +605,9 @@ int cs447::RTSPSendResponse(int &_ClientSocket, int _ResponseCode, RTSPHeaders &
             break;
     }    
     thread(ServerLog,_ServerIP,_ClientIP,_Command,Description).detach();
-
-    return SSL_write(_ClientSocket,msg.c_str(),msg.size());
-    return send(_ClientSocket,msg.c_str(),msg.size(),0);
+    int result = SSL_write(_ClientSocket,msg.c_str(),msg.size());
+    return result;
+    // return send(_ClientSocket,msg.c_str(),msg.size(),0);
 }
 void cs447::ReadOxygenSensor(vector<bitset<5>> &_SensorData, string _FileName, int &_MaxReadings)
 {

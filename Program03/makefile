@@ -28,10 +28,10 @@ dirs:
 	mkdir -p ./.logs
 
 server: sensorcontrolclient.o sensorcontrol.o rtspheaders.o tcpargs.o common.o server.o servermain.o 
-	g++ -g -pthread ./bin/server/sensorcontrolclient.o ./bin/server/sensorcontrol.o ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server/server.o ./bin/server/main.o -o ./server.app
+	g++ -g -pthread ./bin/server/sensorcontrolclient.o ./bin/server/sensorcontrol.o ./bin/rtspheaders.o ./bin/tcpargs.o ./bin/common.o ./bin/server/server.o ./bin/server/main.o -o ./server.app -lssl -lcrypto
 
 controller: rtspheaders.o tcpargs.o common.o controller.o controllermain.o
-	g++ -g -pthread ./bin/tcpargs.o ./bin/common.o ./bin/controller/controller.o ./bin/controller/main.o -o ./controller.app
+	g++ -g -pthread ./bin/tcpargs.o ./bin/common.o ./bin/controller/controller.o ./bin/controller/main.o -o ./controller.app -lssl -lcrypto
 
 receiver: common.o receiver.o receivermain.o
 	g++ -g -pthread ./bin/common.o ./bin/receiver/receiver.o ./bin/receiver/main.o -o ./receiver.app
@@ -46,7 +46,7 @@ controllermain.o: src/Controller/main.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Controller/main.cpp -o ./bin/controller/main.o
 
 controller.o: src/Controller/controller.cpp src/Controller/controller.hpp
-	g++ -c -Wall -g $(INC) src/Controller/controller.cpp -o ./bin/controller/controller.o
+	g++ -c -Wall -lssl -lcrypto -g $(INC) src/Controller/controller.cpp -o ./bin/controller/controller.o
 
 receivermain.o: src/Receiver/main.cpp src/Common/common.hpp
 	g++ -c -Wall -g $(INC) src/Receiver/main.cpp -o ./bin/receiver/main.o
