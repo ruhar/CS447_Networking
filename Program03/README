@@ -1,4 +1,3 @@
-
  _____  _____    ___   ___  ______
 /  __ \/  ___|  /   | /   ||___  /
 | /  \/\ `--.  / /| |/ /| |   / / 
@@ -6,25 +5,26 @@
 | \__/\/\__/ /\___  \___  |./ /   
  \____/\____/     |_/   |_/\_/    
                                   
-                                  
-____________       _____  _____   
-| ___ \ ___ \     |  _  |/ __  \  
-| |_/ / |_/ /_____| |/' |`' / /'  
-|  __/|    /______|  /| |  / /    
-| |   | |\ \      \ |_/ /./ /___  
-\_|   \_| \_|      \___/ \_____/  
-                                  
+____________       _____  _____ 
+| ___ \ ___ \     |  _  ||____ |
+| |_/ / |_/ /_____| |/' |    / /
+|  __/|    /______|  /| |    \ \
+| |   | |\ \      \ |_/ /.___/ /
+\_|   \_| \_|      \___/ \____/ 
+                                
                     
 Author:
 Ben Hubler
 bhubler@siue.edu
-November 5, 2018
+December 3, 2018
               
 Summary:
-Program 02 implements a make shift version of the rtsp out of band protocol to aid Captain Haddock monitor oxygen, temperature, and pressure in his quest to find the last unicorn. There are 3 executables, server.app, controller.app, and receiver.app. The server and receiver should be running before the controller. The controller is capable of accepting multiple clients that act independently of one another to receive the same sensor data.
+Program 03 implements a make shift version of the RTSP out of band protocol to aid Captain Haddock monitor oxygen, temperature, and pressure in his quest to find the last unicorn. Unfortunately, Captain Haddock has fallen victim to man-in-the-middle attacks and unauthorized use of his sensor array. The primary objectives for program 3 is to create an application that utilizes multithreading to facilitate multiple client pairs in a secure manner and allow only authenticated users. Attempt to make the program stable utilizing error control with try/catch blocks. Exit client pairs cleanly with proper thread management. Provide an an easy to use interface, all while learning more about creating protocols using the sockets library and the OpenSSL library.
+
+When successfully complied, there are three executables, server.app, controller.app, and receiver.app. The server and receiver should be running before the controller. The server is capable of accepting multiple clients that act independently of one another to receive the same sensor data.
 
 Extra Credit:
-Multiple controller/receiver client pairs can connect to the server concurrently. In addition, if one client is playing temperature, it will not display on paused clients. Seperate clients are able to request pause, but the server will only pause if no other connected clients are playing that sensor. When a client pauses, but another continues, when paused client plays again, it will start playing data from the other clients position. If all clients are paused, data will not be processed until a client performs a play.
+User friendliness has been improved by offering the use of quick commands and an advanced help information display on initial startup of the controller.
 
 Installation:
 From the directory with "makefile"
@@ -53,8 +53,8 @@ Example
 Usage:
 All commands are issued from the controller application.
 The following quick commands are recommended, however all command can be fully typed.
-setup     #must be ran first before any data can be sent to receiver
-play      #
+setupauth #must be ran first before any data can be sent to receiver
+play      
 pause
 teardown
 
@@ -63,6 +63,10 @@ teardown
 Files Included:
 /README
 /makefile
+/PR03-WireShark.pcap
+/PR03-SSL-WireShark.pcap
+/Program03-Report.pdf
+/bhubler_cs447.pem
 /src/Common/common.cpp
 /src/Common/common.hpp
 /src/Common/rtspheaders.cpp

@@ -41,7 +41,8 @@ void cs447::Help()
     cout<<"setup rtsp://localhost rtsp/2.0 <crlf>"<<endl;
     cout<<"cseq:<sequencenumber> <crlf>"<<endl;
     cout<<"transport:udp;unicast;dest_addr=\":<receiver-port>\""<<endl;
-    cout<<"sensor:<* or comma delimited t,p,o> <crlf>"<<endl<<endl;
+    cout<<"sensor:<* or comma delimited t,p,o> <crlf>"<<endl;
+    cout<<"authorization: basic  aGFkZG9jazpwaXJhdGVzIQ=="<<endl<<endl;
     cout<<"Play Command:"<<endl;
     cout<<"play rtsp://localhost rtsp/2.0 <crlf>"<<endl;
     cout<<"cseq:<sequencenumber> <crlf>"<<endl;
