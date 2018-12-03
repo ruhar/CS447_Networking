@@ -11,6 +11,6 @@ namespace cs447
     void Help();
     void Goodbye();
     void RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _ReceiverPort);
-    void RTSPReceiver(tcpargs _TCPArguments);
-    void RTSPSender(tcpargs _TCPArguments, int _ReceiverPort);
+    void RTSPReceiver(tcpargs _TCPArguments, bool &_Running, bool &_Teardown);
+    void RTSPSender(tcpargs _TCPArguments, int _ReceiverPort, bool &_Running, bool &_Teardown);
 }

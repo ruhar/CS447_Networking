@@ -30,7 +30,7 @@ using namespace std;
 using namespace cs447;
 
 static int sckaccept;
-const int BUFFERSIZE = 64;
+const int BUFFERSIZE = 256;
 const uint OXYGENMAX = 16;
 const uint PRESSUREMAX = 1050;
 const uint TEMPERATUREMAX = 255;
@@ -55,26 +55,6 @@ void cs447::Hello()
 void cs447::Goodbye()
 {
     cout<<"Thank you for using sensor probing services!\n";    
-}
-
-void ShowCerts(SSL* ssl)
-{   X509 *cert;
-    char *line;
- 
-    cert = SSL_get_peer_certificate(ssl); /* Get certificates (if available) */
-    if ( cert != NULL )
-    {
-        printf("Server certificates:\n");
-        line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
-        printf("Subject: %s\n", line);
-        free(line);
-        line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
-        printf("Issuer: %s\n", line);
-        free(line);
-        X509_free(cert);
-    }
-    else
-        printf("No certificates.\n");
 }
 
 void cs447::RTSPServer(int _Port, string _OxygenFile, string _TemperatureFile, string _PressureFile)
@@ -139,7 +119,6 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     SSL_CTX *ctx;
     //ssl initialize
     SSL_load_error_strings();
-    ERR_print_errors_fp(stderr);
     OpenSSL_add_all_algorithms();
     //ssl context
     ctx = SSL_CTX_new(method);
@@ -155,17 +134,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     SSL *sck;
     sck = SSL_new(ctx);
     SSL_set_fd(sck, clntsck);
-    int sslaccept = SSL_accept(sck);
-    if(sslaccept < 0)
-    {
-        // cout<<"Error: "<<to_string(sslaccept)<<":"<<strerror(errno)<<endl;
-        // ERR_print_errors_fp(stderr);
-        // close(clntsck);
-        // throw runtime_error("SSL Socket Accept error\n");
-    }
-    ShowCerts(sck);
-
-
+    SSL_accept(sck);
 
     bool listening = true;
     RTSPHeaders headers = RTSPHeaders();
@@ -258,15 +227,12 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                 {
                     dataentry = false;
                 }
-                cout<<"Message:"<<rcvdmsg<<"|Length:"<<rcvdmsglength<<endl;
             }while(dataentry);
             if(uservalid)
             {
-
                 if(cseqvalid)
                 {
                     headers.CSeq = teardowncseq;
-                    RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN,serverIP,clientIP,"TEARDOWN");
                     int udpsck = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
                     struct sockaddr_in saddress;
                     saddress.sin_family = AF_INET; 
@@ -275,7 +241,10 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
                     string sending = "teardown";
                     sControl.SetPlaying(clntsck,false,false,false);
                     sendto(udpsck, sending.c_str(), sending.length(), 0,(struct sockaddr *) &saddress, sizeof(saddress));
+                    RTSPSendResponse(sck,200,headers,HEADER::TEARDOWN,serverIP,clientIP,"TEARDOWN");
+                    // RTSPSendResponse(sck,410,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"TEARDOWN");
                     listening = false;
+                    close(clntsck);
                 }
                 else
                 {
@@ -548,6 +517,7 @@ void cs447::RTSPServerHandler(tcpargs _sckinfo)
     if(!uservalid)
     {
         RTSPSendResponse(sck,410,headers,HEADER::UNAUTHORIZED,serverIP,clientIP,"SETUP");
+        close(clntsck);
     }
     cout<<"Closing RTSP Control Thread for client IP: "<<clientIP<<endl;
     sControl.DisconnectClient(clntsck);

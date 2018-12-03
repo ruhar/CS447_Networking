@@ -22,28 +22,9 @@
 using namespace std;
 using namespace cs447;
 int sequence = 0;
-const int BUFFERSIZE = 64;
-
-void ShowCerts(SSL* ssl)
-{
-       X509 *cert;
-    char *line;
- 
-    cert = SSL_get_peer_certificate(ssl); /* get the server's certificate */
-    if ( cert != NULL )
-    {
-        printf("Server certificates:\n");
-        line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
-        printf("Subject: %s\n", line);
-        free(line);       /* free the malloc'ed string */
-        line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
-        printf("Issuer: %s\n", line);
-        free(line);       /* free the malloc'ed string */
-        X509_free(cert);     /* free the malloc'ed certificate copy */
-    }
-    else
-        printf("Info: No client certificates configured.\n");
-}
+const int BUFFERSIZE = 256;
+bool running = true;
+bool teardown = false;
 
 void cs447::Hello()
 {
@@ -120,22 +101,20 @@ void cs447::RTSPControlClient(std::string _ServerAddress, int _ServerPort, int _
     int sslconnect = SSL_connect(serverinfo.ssl);
     if(sslconnect != 1)
     {
-        cout<<"Error:"<<endl;
         ERR_print_errors_fp(stderr);
-        cout<<"4:"<<to_string(sslconnect)<<endl;
     }
-    ShowCerts(serverinfo.ssl);
     serverinfo.socket = sck;
     serverinfo.address = saddress;
-    thread sendthread (RTSPSender,serverinfo,_ReceiverPort);
-    thread rcvthread (RTSPReceiver,serverinfo);
+    thread sendthread (RTSPSender,serverinfo,_ReceiverPort,std::ref(running),std::ref(teardown));
+    thread rcvthread (RTSPReceiver,serverinfo,std::ref(running),std::ref(teardown));
 
-    sendthread.join();
-    // rcvthread.detach();
-    // rcvthread.~thread();
+    rcvthread.join();
+    sendthread.detach();
+    sendthread.~thread();
     close(sck);
+    SSL_free(serverinfo.ssl);
 }
-void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
+void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort, bool &_Running, bool &_Teardown)
 {
     SSL *ssl = _TCPArguments.ssl;
     
@@ -147,8 +126,8 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
     hostname = hostparts[0];
     string input = "";
     string buffer = "";
-    bool running = true;
-    while(running)
+    // bool running = true;
+    while(_Running)
     {
         input = "";
         getline(cin,input);
@@ -256,6 +235,7 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
         }
         else if(regex_match(buffer,regex("( ){0,}teardown( ){0,}(\\s){0,}",regex::icase)))
         {
+            _Teardown = true;
             buffer = "teardown rtsp://" + hostname + " rtsp/2.0\r\n";
             // send(socket,buffer.c_str(),buffer.length(),0);
             SSL_write(ssl,buffer.c_str(),buffer.length());
@@ -270,7 +250,8 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
             // send(socket,buffer.c_str(),buffer.length(),0);
             SSL_write(ssl,buffer.c_str(),buffer.length());
             this_thread::sleep_for(chrono::milliseconds(100));
-            running = false;
+            // running = false;
+            
         }
         else if(regex_match(buffer,regex("( ){0,}help( ){0,}(\\s){0,}",regex::icase)))
         {
@@ -278,21 +259,24 @@ void cs447::RTSPSender(tcpargs _TCPArguments, int _ReceiverPort)
         }
         else
         {
+            if(regex_search(buffer,regex("^( ){0,}(teardown){1}",regex::icase)))
+            {
+                _Teardown = true;
+            }
             buffer += "\r\n";
             // send(socket,buffer.c_str(),buffer.length(),0);
             SSL_write(ssl,buffer.c_str(),buffer.length());
         }
     }
 }
-void cs447::RTSPReceiver(tcpargs _TCPArguments)
+void cs447::RTSPReceiver(tcpargs _TCPArguments, bool &_Running, bool &_Teardown)
 {
-    bool listening = true;
-    int socket = _TCPArguments.socket;
+    // int socket = _TCPArguments.socket;
     SSL *ssl = _TCPArguments.ssl;
 
     char buffer[BUFFERSIZE];
     memset(buffer, 0, BUFFERSIZE);
-    while(listening)
+    while(_Running)
     {
         int rcvdmsglength;
         try
@@ -317,6 +301,18 @@ void cs447::RTSPReceiver(tcpargs _TCPArguments)
         if(regex_search(rcvdmsg,regex("RTSP/2.0 200 OK",regex::icase)))
         {
             sequence++;
+            if(_Teardown)
+            {
+                _Running = false;
+            }
+        }
+        else if(regex_search(rcvdmsg,regex("RTSP/2.0 410 Gone",regex::icase)))
+        {
+            _Running = false;
+        }
+        else
+        {
+            _Teardown = false;
         }
     }
 }
