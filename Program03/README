@@ -23,6 +23,10 @@ Program 03 implements a make shift version of the RTSP out of band protocol to a
 
 When successfully complied, there are three executables, server.app, controller.app, and receiver.app. The server and receiver should be running before the controller. The server is capable of accepting multiple clients that act independently of one another to receive the same sensor data.
 
+*Note: The SSL certificate must be named bhubler_cs447.pem in the same directory as the executables.
+This file should also contain the public key, and private key. The file included was generated using
+openssl and is self signed.
+
 Extra Credit:
 User friendliness has been improved by offering the use of quick commands and an advanced help information display on initial startup of the controller.
 
